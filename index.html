@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Historian jäljillä – GPS-äänikävelyitä ja virtuaalisia tarinoita paikoista ja niiden historiasta. Tutustu toteutuksiin Lappeenrannassa.">
+<title>Historian jäljillä – äänikävelyt ja virtuaaliset tarinat</title>
+<style>
+:root{
+ --cream:#d9c39a; --paper:#ead8b3; --dark:#30241c; --brown:#5a3929;
+ --rust:#93462e; --gold:#b4864f; --light:#f5ead3;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--cream);color:var(--dark);font-family:Georgia,"Times New Roman",serif;line-height:1.55}
+header{background:linear-gradient(90deg,#2b211a,#4b3024);color:var(--light);border-bottom:5px solid var(--rust)}
+nav{max-width:1120px;margin:auto;padding:17px 20px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.logo{font-size:24px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase}
+nav a{color:var(--light);text-decoration:none;font-family:Arial,sans-serif;font-size:14px;margin-left:18px}
+.hero{background:linear-gradient(rgba(43,31,23,.82),rgba(43,31,23,.72)),url("rakuunamaki.png") center 38%/cover;min-height:470px;display:flex;align-items:center;text-align:center;color:#fff5df}
+.hero-inner{max-width:900px;margin:auto;padding:55px 22px}
+.eyebrow{font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:.22em;font-size:13px}
+h1{font-size:clamp(48px,8vw,82px);line-height:1;margin:15px 0;text-shadow:0 3px 12px #000}
+.hero p{font-size:clamp(18px,2.5vw,24px);max-width:720px;margin:18px auto}
+.tagline{color:#f0c890;font-weight:bold;letter-spacing:.08em}
+section{scroll-margin-top:20px}
+.intro{max-width:900px;margin:0 auto;text-align:center;padding:52px 20px 25px}
+.intro h2,.how h2,.offer h2{font-size:clamp(30px,5vw,44px);margin:0 0 12px}
+.intro p{font-size:18px}
+.cards{max-width:1120px;margin:auto;padding:15px 20px 55px;display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.card{background:var(--light);border:1px solid #a9865b;box-shadow:0 10px 25px #50351f28;overflow:hidden}
+.card img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}
+.card-body{padding:24px}
+.card h3{font-size:32px;margin:0 0 7px}
+.location{font:700 13px Arial,sans-serif;color:var(--rust);text-transform:uppercase;letter-spacing:.12em}
+.buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.btn{display:inline-block;padding:12px 16px;background:var(--rust);color:white;text-decoration:none;border-radius:4px;font:bold 14px Arial,sans-serif}
+.btn.alt{background:var(--brown)}
+.how{background:var(--paper);border-block:1px solid #b69466;padding:48px 20px}
+.how-inner{max-width:980px;margin:auto;text-align:center}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:30px}
+.step-num{font-size:34px;color:var(--rust);font-weight:bold}.step strong{display:block;font-size:20px;margin:5px}
+.offer{background:#38271e;color:#f6ead3;padding:58px 20px;text-align:center}
+.offer-inner{max-width:820px;margin:auto}
+.offer p{font-size:18px}
+.offer .small{font-size:15px;color:#ddc8a6;margin-top:22px}
+footer{background:#241a15;color:#cdbb9d;text-align:center;padding:23px;font:13px Arial,sans-serif}
+@media(max-width:760px){
+ nav{display:block;text-align:center}.links{margin-top:8px}nav a{margin:0 7px}
+ .hero{min-height:420px}.cards{grid-template-columns:1fr}
+ .steps{grid-template-columns:1fr}.buttons{display:block}.btn{display:block;text-align:center;margin-top:9px}
+}
+</style>
+</head>
+<body>
+<header><nav>
+<div class="logo">Historian jäljillä</div>
+<div class="links"><a href="#toteutukset">Toteutukset</a><a href="#toiminta">Miten toimii?</a><a href="#idea">Oma kohde?</a></div>
+</nav></header>
+
+<div class="hero">
+ <div class="hero-inner">
+  <div class="eyebrow">Äänikävelyitä ja virtuaalisia tarinoita</div>
+  <h1>Historian jäljillä</h1>
+  <p>Paikat heräävät eloon tarinoiden, äänen ja kuvien avulla.</p>
+  <div class="tagline">KUUNTELE • KÄVELE • KOE</div>
+ </div>
+</div>
+
+<section class="intro" id="toteutukset">
+ <h2>Tutustu toteutuksiin Lappeenrannassa</h2>
+ <p>GPS-äänikävely vie tarinan sinne, missä historia on tapahtunut. Virtuaaliesittelyyn voi puolestaan tutustua verkossa vaikka kotisohvalta.</p>
+</section>
+
+<section class="cards">
+ <article class="card">
+  <img src="rakuunamaki.png" alt="Rakuunamäen äänikävelyn kuvitus">
+  <div class="card-body"><div class="location">Lappeenranta</div><h3>Rakuunamäki</h3>
+   <p>Kulje historiallisen kasarmialueen läpi ja tutustu Rakuunamäen ratsuväkiperinteeseen, rakennuksiin ja tarinoihin.</p>
+   <div class="buttons">
+    <a class="btn" href="https://virtuaalikavelyt.github.io/rakuunamaki-kavely/" target="_blank" rel="noopener">▶ Katso virtuaaliesittely</a>
+    <a class="btn alt" href="https://explore.echoes.xyz/collections/TqPkhOET5QlSY0F5" target="_blank" rel="noopener">🎧 Koe äänikävely</a>
+   </div>
+  </div>
+ </article>
+
+ <article class="card">
+  <img src="linnoitus.png" alt="Lappeenrannan Linnoituksen äänikävelyn kuvitus">
+  <div class="card-body"><div class="location">Lappeenranta</div><h3>Linnoitus</h3>
+   <p>Kulje Linnoituksen kujilla ja valleilla ja kuuntele paikan tarinoita omaan tahtiisi.</p>
+   <div class="buttons">
+    <a class="btn alt" href="https://explore.echoes.xyz/collections/GCyRId4eGQP7n8Nv" target="_blank" rel="noopener">🎧 Koe äänikävely</a>
+   </div>
+  </div>
+ </article>
+</section>
+
+<section class="how" id="toiminta"><div class="how-inner">
+ <h2>Miten äänikävely toimii?</h2>
+ <div class="steps">
+  <div class="step"><div class="step-num">01</div><strong>Avaa kävely</strong>Valitse kohde puhelimellasi ja lataa kävely halutessasi valmiiksi.</div>
+  <div class="step"><div class="step-num">02</div><strong>Lähde liikkeelle</strong>Kulje reittiä omaan tahtiisi. Kuulokkeet ovat suositeltavat.</div>
+  <div class="step"><div class="step-num">03</div><strong>Paikka kertoo tarinansa</strong>Äänet ja tarinat käynnistyvät GPS:n avulla lähestyessäsi kohteita.</div>
+ </div>
+</div></section>
+
+<section class="offer" id="idea"><div class="offer-inner">
+ <div class="eyebrow">Äänikävely ideana</div>
+ <h2>Voisiko sinun kohteellasi olla oma tarinansa?</h2>
+ <p>Samanlainen kokonaisuus voidaan rakentaa esimerkiksi historialliselle kohteelle, hotellille, matkailukohteelle tai kaupunginosalle. Äänikävely voi toimia paikan päällä, ja sitä voidaan täydentää verkossa katsottavalla virtuaaliesittelyllä.</p>
+ <p class="small">Esitysten kuvituksessa, kuvien muokkauksessa, kertojahahmossa ja äänessä voidaan hyödyntää tekoälyä. Historiallinen sisältö koostetaan ja muokataan erikseen kuhunkin kohteeseen.</p>
+</div></section>
+
+<footer>© 2026 Historian jäljillä</footer>
+</body></html>
