@@ -90,23 +90,24 @@ if(wake){try{await wake.release()}catch(e){} wake=null;}
 startBtn.textContent="▶ Aloita kävely";
 statusEl.innerHTML="<b>Kävely lopetettu.</b><br>GPS-seuranta ei ole enää päällä.";
 }
-function gpsError(e){
-  if(e.code===1){
-    statusEl.innerHTML=`<b>Sijaintilupa tarvitaan.</b><br>Äänikävely tarvitsee sijaintisi, jotta tarinat käynnistyvät oikeissa paikoissa.<br><br><b>iPhone / Safari:</b> salli sivustolle sijainnin käyttö ja varmista, että <b>Tarkka sijainti</b> on käytössä. Jos lupa on aiemmin estetty, muuta se iPhonen asetuksista ja paina sitten Aloita kävely uudelleen.`;
-  }else if(e.code===2){
-    statusEl.innerHTML=`<b>Sijaintia ei saatu.</b><br>Varmista, että puhelimen sijaintipalvelut ovat päällä ja yritä uudelleen.`;
-  }else if(e.code===3){
-    statusEl.innerHTML=`<b>GPS ei vastannut ajoissa.</b><br>Siirry tarvittaessa avoimempaan paikkaan ja yritä uudelleen.`;
-  }else{statusEl.textContent="GPS-virhe: "+e.message;}
-  started=false;
-  watchId=null;
-  startBtn.textContent="▶ Aloita kävely";
-}
 startBtn.onclick=async()=>{
-  if(started){await stopWalk();return;}
-  if(!navigator.geolocation){statusEl.innerHTML="<b>Sijainti ei ole käytettävissä tässä selaimessa.</b>";return;}
-  statusEl.innerHTML="<b>Sijaintilupaa pyydetään…</b><br>Jos puhelin kysyy lupaa, valitse Salli.";
-  started=true;startBtn.textContent="■ Lopeta kävely";await awake();
-  try{aud[0].muted=true;await aud[0].play();aud[0].pause();aud[0].currentTime=0;aud[0].muted=false}catch(e){}
-  watchId=navigator.geolocation.watchPosition(pos=>{let n=-1,nd=Infinity;pts.forEach((p,i)=>{if(done.has(i))return;let x=d(pos.coords.latitude,pos.coords.longitude,p.lat,p.lon);if(x<nd){nd=x;n=i}});if(n<0){statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br><b>Kaikki 12 kohdetta kuunneltu.</b>`;return}let p=pts[n];statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br>Lähin kuuntelematon piste: <b>${n+1}. ${p.name}</b><br>Etäisyys: <b>${Math.round(nd)} m</b>`;if(nd<=p.radius&&!playing)play(n)},gpsError,{enableHighAccuracy:true,maximumAge:0,timeout:15000});
-};draw();</script></body></html>
+if(started){await stopWalk();return;}
+if(!("geolocation" in navigator)){statusEl.innerHTML="<b>Sijaintia ei voida käyttää tässä selaimessa.</b>";return;}
+started=true;
+startBtn.textContent="■ Lopeta kävely";
+statusEl.innerHTML="<b>Kävely käynnistyy…</b><br>Odotetaan ensimmäistä GPS-sijaintia.";
+watchId=navigator.geolocation.watchPosition(pos=>{
+if(!started)return;
+let n=-1,nd=Infinity;
+pts.forEach((p,i)=>{if(done.has(i))return;let x=d(pos.coords.latitude,pos.coords.longitude,p.lat,p.lon);if(x<nd){nd=x;n=i}});
+if(n<0){statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br><b>Kaikki 12 kohdetta kuunneltu.</b>`;return;}
+let p=pts[n];
+statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br>Lähin kuuntelematon piste: <b>${n+1}. ${p.name}</b><br>Etäisyys: <b>${Math.round(nd)} m</b>`;
+if(nd<=p.radius&&!playing)play(n);
+},e=>{
+if(e.code===1){statusEl.innerHTML=`<b>Sijaintilupa tarvitaan.</b><br>Äänikävely tarvitsee sijaintisi, jotta tarinat käynnistyvät oikeissa paikoissa.<br><br><b>iPhone / Safari:</b> salli sivustolle sijainnin käyttö Safarin verkkosivuston asetuksista ja käynnistä kävely uudelleen.`;}
+else if(e.code===2){statusEl.innerHTML="<b>Sijaintia ei juuri nyt saada.</b><br>Odota hetki ulkona ja yritä uudelleen.";}
+else{statusEl.innerHTML="<b>GPS ei vastannut ajoissa.</b><br>Paina Lopeta kävely ja käynnistä kävely uudelleen.";}
+},{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+awake();
+}draw();</script></body></html>
