@@ -23,12 +23,12 @@ small{color:#9da29b}
 <h1>Rakuunamäki</h1>
 <p class="lead">Kulje historiallisen kasarmialueen halki. Tarinat käynnistyvät automaattisesti, kun saavut kohteisiin.</p>
 <div class="tag">12 kohdetta · GPS-äänikävely</div>
-<button id="start">▶ Aloita kävely</button>
+<button id="start">▶ Aloita kävely</button><div style="font-size:14px;color:#adb1ab;line-height:1.45;margin:10px 2px 4px">Kun aloitat, selain pyytää tarvittaessa luvan sijainnin käyttöön. Salli sijainti, jotta kohteet käynnistyvät automaattisesti.</div>
 <button id="routeBtn" class="secondary">Näytä reitti</button>
 <div id="routeBox" class="route-box" hidden><div id="routeMap"></div></div>
 <div id="status">Kävely ei ole vielä käynnissä.</div>
 <div class="route-title">Kävelyn kohteet</div>
-<div id="list"><div class="p">1. Suomen ratsuväen muistomerkki</div><div class="p">2. Rakuunamäen pääportti & Pave Maijanen</div><div class="p">3. Päävartiorakennus</div><div class="p">4. Pohjustus ennen Rakuunahotellia</div><div class="p">5. Hotelli Rakuuna</div><div class="p">6. Sotilaskoti</div><div class="p">7. Vanha ruokala</div><div class="p">8. Chymoksen portti</div><div class="p">9. Chymos</div><div class="p">10. Upseerikerho</div><div class="p">11. Tuju Taproom</div><div class="p">12. Adolf Ehrnroothin aukio</div></div>
+<div id="list"></div>
 <p class="note"><b>Puhelin voi olla taskussa.</b> Näyttö pidetään kävelyn aikana automaattisesti päällä, jotta GPS ja tarinoiden automaattinen käynnistys toimivat luotettavasti. Älä sammuta näyttöä virtapainikkeesta.</p>
 </div></main>
 <script>const pts=[{"name": "Suomen ratsuväen muistomerkki", "lat": 61.059663, "lon": 28.180214, "audio": "01_patsas.mp3", "radius": 20}, {"name": "Rakuunamäen pääportti & Pave Maijanen", "lat": 61.059783, "lon": 28.178977, "audio": "02_paaportti.mp3", "radius": 30}, {"name": "Päävartiorakennus", "lat": 61.0591569, "lon": 28.1784266, "audio": "03_paavartio.mp3", "radius": 30}, {"name": "Pohjustus ennen Rakuunahotellia", "lat": 61.0593719, "lon": 28.177457, "audio": "04_pohjustus.mp3", "radius": 30}, {"name": "Hotelli Rakuuna", "lat": 61.059266, "lon": 28.17633415, "audio": "05_hotellirakuuna.mp3", "radius": 30}, {"name": "Sotilaskoti", "lat": 61.059182, "lon": 28.175187, "audio": "06_sotilaskoti.mp3", "radius": 30}, {"name": "Vanha ruokala", "lat": 61.0591133, "lon": 28.1737116, "audio": "07_ruokala.mp3", "radius": 30}, {"name": "Chymoksen portti", "lat": 61.058047, "lon": 28.173163, "audio": "08_chymosportti.mp3", "radius": 30}, {"name": "Chymos", "lat": 61.0580152, "lon": 28.1722136, "audio": "09_chymos.mp3", "radius": 30}, {"name": "Upseerikerho", "lat": 61.0591837, "lon": 28.1705692, "audio": "10_upseerikerho.mp3", "radius": 30}, {"name": "Tuju Taproom", "lat": 61.0594142, "lon": 28.1737352, "audio": "11_tuju.mp3", "radius": 30}, {"name": "Adolf Ehrnroothin aukio", "lat": 61.060096, "lon": 28.174944, "audio": "12_aukio.mp3", "radius": 45}];const aud=pts.map(p=>new Audio(p.audio));
@@ -90,23 +90,69 @@ if(wake){try{await wake.release()}catch(e){} wake=null;}
 startBtn.textContent="▶ Aloita kävely";
 statusEl.innerHTML="<b>Kävely lopetettu.</b><br>GPS-seuranta ei ole enää päällä.";
 }
-function gpsError(e){
-  if(e.code===1){
-    statusEl.innerHTML=`<b>Sijaintilupa tarvitaan.</b><br>Äänikävely tarvitsee sijaintisi, jotta tarinat käynnistyvät oikeissa paikoissa.<br><br><b>iPhone / Safari:</b> salli sivustolle sijainnin käyttö ja varmista, että <b>Tarkka sijainti</b> on käytössä. Jos lupa on aiemmin estetty, muuta se iPhonen asetuksista ja paina sitten Aloita kävely uudelleen.`;
-  }else if(e.code===2){
-    statusEl.innerHTML=`<b>Sijaintia ei saatu.</b><br>Varmista, että puhelimen sijaintipalvelut ovat päällä ja yritä uudelleen.`;
-  }else if(e.code===3){
-    statusEl.innerHTML=`<b>GPS ei vastannut ajoissa.</b><br>Siirry tarvittaessa avoimempaan paikkaan ja yritä uudelleen.`;
-  }else{statusEl.textContent="GPS-virhe: "+e.message;}
+function geoError(e){
   started=false;
-  watchId=null;
-  startBtn.textContent="▶ Aloita kävely";
+  if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  startBtn.textContent="▶ Yritä uudelleen";
+  if(e.code===1){
+    statusEl.innerHTML='<b>Sijaintilupa tarvitaan.</b><br>Salli tämän sivuston sijainnin käyttö selaimen asetuksista ja paina sitten <b>Yritä uudelleen</b>.';
+  }else if(e.code===2){
+    statusEl.innerHTML='<b>Sijaintia ei saatu juuri nyt.</b><br>Siirry mahdollisuuksien mukaan ulos avoimemmalle paikalle ja paina <b>Yritä uudelleen</b>.';
+  }else if(e.code===3){
+    statusEl.innerHTML='<b>GPS:n käynnistyminen kesti liian kauan.</b><br>Paina <b>Yritä uudelleen</b>.';
+  }else{
+    statusEl.innerHTML='<b>GPS ei käynnistynyt.</b><br>Paina <b>Yritä uudelleen</b>.';
+  }
 }
+
 startBtn.onclick=async()=>{
   if(started){await stopWalk();return;}
-  if(!navigator.geolocation){statusEl.innerHTML="<b>Sijainti ei ole käytettävissä tässä selaimessa.</b>";return;}
-  statusEl.innerHTML="<b>Sijaintilupaa pyydetään…</b><br>Jos puhelin kysyy lupaa, valitse Salli.";
-  started=true;startBtn.textContent="■ Lopeta kävely";await awake();
-  try{aud[0].muted=true;await aud[0].play();aud[0].pause();aud[0].currentTime=0;aud[0].muted=false}catch(e){}
-  watchId=navigator.geolocation.watchPosition(pos=>{let n=-1,nd=Infinity;pts.forEach((p,i)=>{if(done.has(i))return;let x=d(pos.coords.latitude,pos.coords.longitude,p.lat,p.lon);if(x<nd){nd=x;n=i}});if(n<0){statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br><b>Kaikki 12 kohdetta kuunneltu.</b>`;return}let p=pts[n];statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br>Lähin kuuntelematon piste: <b>${n+1}. ${p.name}</b><br>Etäisyys: <b>${Math.round(nd)} m</b>`;if(nd<=p.radius&&!playing)play(n)},gpsError,{enableHighAccuracy:true,maximumAge:0,timeout:15000});
-};draw();</script></body></html>
+  if(!("geolocation" in navigator)){
+    statusEl.innerHTML="<b>Tämä selain ei tarjoa sijaintia tälle sivulle.</b>";
+    return;
+  }
+
+  statusEl.innerHTML="<b>Pyydetään sijaintia…</b><br>Salli sijainnin käyttö, jos selain kysyy sitä.";
+
+  try{
+    aud[0].muted=true;
+    await aud[0].play();
+    aud[0].pause();
+    aud[0].currentTime=0;
+    aud[0].muted=false;
+  }catch(e){}
+
+  navigator.geolocation.getCurrentPosition(async firstPos=>{
+    started=true;
+    startBtn.textContent="■ Lopeta kävely";
+    await awake();
+
+    function handlePos(pos){
+      let n=-1,nd=Infinity;
+      pts.forEach((p,i)=>{
+        if(done.has(i))return;
+        let x=d(pos.coords.latitude,pos.coords.longitude,p.lat,p.lon);
+        if(x<nd){nd=x;n=i}
+      });
+      if(n<0){
+        statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br><b>Kaikki 12 kohdetta kuunneltu.</b>`;
+        return;
+      }
+      let p=pts[n];
+      statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br>Lähin kuuntelematon piste: <b>${n+1}. ${p.name}</b><br>Etäisyys: <b>${Math.round(nd)} m</b>`;
+      if(nd<=p.radius&&!playing)play(n);
+    }
+
+    handlePos(firstPos);
+    watchId=navigator.geolocation.watchPosition(handlePos,geoError,{
+      enableHighAccuracy:true,
+      maximumAge:3000,
+      timeout:20000
+    });
+  },geoError,{
+    enableHighAccuracy:true,
+    maximumAge:0,
+    timeout:20000
+  });
+};
+draw();</script></body></html>
