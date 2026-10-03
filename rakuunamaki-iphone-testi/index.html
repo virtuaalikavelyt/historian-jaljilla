@@ -40,7 +40,7 @@ let done=new Set(),playing=false,started=false,wake,watchId=null;
 const routeBtn=document.getElementById("routeBtn");
 const routeBox=document.getElementById("routeBox");
 function d(a,b,c,e){const R=6371000,r=Math.PI/180,x=(e-b)*r*Math.cos((a+c)*r/2),y=(c-a)*r;return Math.sqrt(x*x+y*y)*R}
-function draw(){listEl.innerHTML=pts.map((p,i)=>`<div class="p ${done.has(i)?"done":""}">${done.has(i)?"✓ ":""}${i+1}. ${p.name} <small>(${p.radius} m)</small></div>`).join("")}
+function draw(){listEl.innerHTML=pts.map((p,i)=>`<div class="p ${done.has(i)?"done":""}">${done.has(i)?"✓ ":""}${i+1}. ${p.name}</div>`).join("")}
 let routeMap=null;
 function openRouteMap(){
 if(routeMap){setTimeout(()=>routeMap.invalidateSize(),50);return;}
