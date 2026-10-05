@@ -1,4 +1,4 @@
-<!doctype html><html lang="fi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rakuunamäki GPS – iPhone audio fix</title>
+<!doctype html><html lang="fi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rakuunamäki GPS – kaikki tarinat esiladattu</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -37,6 +37,12 @@ let audioCtx=null,currentSource=null;
 const audioBuffers=new Map(),audioLoads=new Map();
 async function ensureAudioContext(){if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==="suspended")await audioCtx.resume()}
 function preloadAudio(i){if(i<0||i>=pts.length||audioBuffers.has(i))return Promise.resolve();if(audioLoads.has(i))return audioLoads.get(i);const job=fetch(pts[i].audio,{cache:"force-cache"}).then(r=>{if(!r.ok)throw new Error("MP3 "+r.status);return r.arrayBuffer()}).then(b=>audioCtx.decodeAudioData(b)).then(buf=>{audioBuffers.set(i,buf);audioLoads.delete(i);return buf}).catch(e=>{audioLoads.delete(i);throw e});audioLoads.set(i,job);return job}
+let allAudioReady=false;
+async function preloadAllAudio(){
+  const results=await Promise.allSettled(pts.map((_,i)=>preloadAudio(i)));
+  allAudioReady=results.every(r=>r.status==="fulfilled");
+  return allAudioReady;
+}
 const startBtn=document.getElementById("start");
 const statusEl=document.getElementById("status");
 const listEl=document.getElementById("list");
@@ -84,7 +90,7 @@ if(opening)setTimeout(openRouteMap,30);
 };
 async function awake(){try{if("wakeLock"in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&started)awake()});
-async function play(i){if(playing||done.has(i))return;playing=true;try{await ensureAudioContext();const buf=audioBuffers.get(i)||await preloadAudio(i);if(currentSource){try{currentSource.stop()}catch(e){}}const source=audioCtx.createBufferSource();source.buffer=buf;source.connect(audioCtx.destination);currentSource=source;source.onended=()=>{if(currentSource===source)currentSource=null;playing=false;preloadAudio(i+1).catch(()=>{})};source.start(0);done.add(i);draw();statusEl.innerHTML=`<b>Kohde saavutettu!</b><br>${i+1}. ${pts[i].name}<br>Selostus soi.`;preloadAudio(i+1).catch(()=>{})}catch(e){playing=false;statusEl.innerHTML=`<b>GPS laukesi:</b> ${pts[i].name}<br>Ääntä valmistellaan – pysy hetki kohteella.`}}
+async function play(i){if(playing||done.has(i))return;playing=true;try{await ensureAudioContext();const buf=audioBuffers.get(i)||await preloadAudio(i);if(currentSource){try{currentSource.stop()}catch(e){}}const source=audioCtx.createBufferSource();source.buffer=buf;source.connect(audioCtx.destination);currentSource=source;source.onended=()=>{if(currentSource===source)currentSource=null;playing=false};source.start(0);done.add(i);draw();statusEl.innerHTML=`<b>Kohde saavutettu!</b><br>${i+1}. ${pts[i].name}<br>Selostus soi.`}catch(e){playing=false;statusEl.innerHTML=`<b>GPS laukesi:</b> ${pts[i].name}<br>Ääntä valmistellaan – pysy hetki kohteella.`}}
 async function stopWalk(){
 if(!started)return;
 started=false;
@@ -116,5 +122,22 @@ function showGpsHelp(err){
   gpsHelp.hidden=false;
   statusEl.innerHTML="<b>Sijaintilupa tarvitaan.</b><br>Salli sijainnin käyttö ja paina sitten Yritä uudelleen.";
 }
-startBtn.onclick=async()=>{if(started){await stopWalk();return;}gpsHelp.hidden=true;started=true;startBtn.textContent="■ Lopeta kävely";await awake();try{await ensureAudioContext();const silent=audioCtx.createBuffer(1,1,22050);const src=audioCtx.createBufferSource();src.buffer=silent;src.connect(audioCtx.destination);src.start(0);preloadAudio(0).catch(()=>{});preloadAudio(1).catch(()=>{})}catch(e){}
-statusEl.textContent="GPS käynnistyy…";watchId=navigator.geolocation.watchPosition(pos=>{let n=-1,nd=Infinity;pts.forEach((p,i)=>{if(done.has(i))return;let x=d(pos.coords.latitude,pos.coords.longitude,p.lat,p.lon);if(x<nd){nd=x;n=i}});if(n<0){statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br><b>Kaikki 12 kohdetta kuunneltu.</b>`;return}let p=pts[n];statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br>Lähin kuuntelematon piste: <b>${n+1}. ${p.name}</b><br>Etäisyys: <b>${Math.round(nd)} m</b> · laukaisu ${p.radius} m`;if(nd<=p.radius&&!playing)play(n)},e=>showGpsHelp(e),{enableHighAccuracy:true,maximumAge:0,timeout:15000})};draw();</script></body></html>
+startBtn.onclick=async()=>{if(started){await stopWalk();return;}gpsHelp.hidden=true;started=true;startBtn.textContent="■ Lopeta kävely";await awake();try{
+  await ensureAudioContext();
+  const silent=audioCtx.createBuffer(1,1,22050);
+  const src=audioCtx.createBufferSource();src.buffer=silent;src.connect(audioCtx.destination);src.start(0);
+  statusEl.innerHTML="<b>Ladataan tarinoita…</b><br>Odota hetki. Kävely käynnistyy automaattisesti, kun kaikki äänet ovat valmiina.";
+  const ok=await preloadAllAudio();
+  if(!ok){
+    started=false;
+    startBtn.textContent="▶ Yritä uudelleen";
+    statusEl.innerHTML="<b>Kaikkia tarinoita ei saatu ladattua.</b><br>Tarkista verkkoyhteys ja paina Yritä uudelleen.";
+    return;
+  }
+}catch(e){
+  started=false;
+  startBtn.textContent="▶ Yritä uudelleen";
+  statusEl.innerHTML="<b>Äänien valmistelu epäonnistui.</b><br>Paina Yritä uudelleen.";
+  return;
+}
+statusEl.innerHTML="<b>Kaikki 12 tarinaa ladattu.</b><br>GPS käynnistyy…";watchId=navigator.geolocation.watchPosition(pos=>{let n=-1,nd=Infinity;pts.forEach((p,i)=>{if(done.has(i))return;let x=d(pos.coords.latitude,pos.coords.longitude,p.lat,p.lon);if(x<nd){nd=x;n=i}});if(n<0){statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br><b>Kaikki 12 kohdetta kuunneltu.</b>`;return}let p=pts[n];statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br>Lähin kuuntelematon piste: <b>${n+1}. ${p.name}</b><br>Etäisyys: <b>${Math.round(nd)} m</b> · laukaisu ${p.radius} m`;if(nd<=p.radius&&!playing)play(n)},e=>showGpsHelp(e),{enableHighAccuracy:true,maximumAge:0,timeout:15000})};draw();</script></body></html>
