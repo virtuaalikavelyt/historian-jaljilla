@@ -1,0 +1,94 @@
+<!doctype html><html lang="fi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rakuunamäki GPS</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#0c0e0d;color:#f3f0e8}
+main{max-width:680px;margin:auto;padding:18px}
+.card{background:#171a18;border:1px solid #30352f;border-radius:20px;padding:22px;box-shadow:0 12px 35px rgba(0,0,0,.28)}
+.brand{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:#d0b47b;font-weight:800;margin-bottom:8px}
+h1{font-family:Georgia,serif;font-size:34px;line-height:1.05;margin:0 0 8px}
+.lead{color:#d0d2cd;margin:0 0 16px;line-height:1.5}
+.tag{display:inline-block;border:1px solid #574a31;border-radius:999px;padding:5px 10px;color:#dbc58f;font-size:12px;margin-bottom:16px}
+button{font-size:18px;padding:15px;width:100%;border:0;border-radius:13px;background:#9a7135;color:#fff;font-weight:750;cursor:pointer;margin-top:8px}.secondary{background:#252a26;border:1px solid #4a5149;color:#eee}.route-box{margin-top:12px;background:#101210;border:1px solid #30352f;border-radius:13px;padding:8px;overflow:hidden}#routeMap{height:52vh;min-height:360px;border-radius:10px}.route-stop{padding:8px 4px;border-bottom:1px solid #292d29;line-height:1.3}.route-stop:last-child{border-bottom:0}
+#status{margin:18px 0;line-height:1.55;background:#101210;border:1px solid #2b302b;border-radius:13px;padding:15px}
+.route-title{margin:22px 0 7px;font-size:16px;color:#ead7aa;font-weight:700}
+.p{padding:10px 2px;border-top:1px solid #30352f;color:#d8d9d5}
+.done{font-weight:bold;color:#dfc88f}
+small{color:#9da29b}
+.note{font-size:14px;color:#adb1ab;line-height:1.5;margin:18px 0 0}
+</style></head>
+<body><main><div class="card">
+<div class="brand">Historian jäljillä</div>
+<h1>Rakuunamäki</h1>
+<p class="lead">Kulje historiallisen kasarmialueen halki. Tarinat käynnistyvät automaattisesti, kun saavut kohteisiin.</p>
+<div class="tag">12 kohdetta · GPS-äänikävely</div>
+<button id="start">▶ Aloita kävely</button>
+<button id="routeBtn" class="secondary">Näytä reitti</button>
+<div id="routeBox" class="route-box" hidden><div id="routeMap"></div></div>
+<div id="status">Kävely ei ole vielä käynnissä.</div>
+<div class="route-title">Kävelyn kohteet</div>
+<div id="list"></div>
+<p class="note"><b>Puhelin voi olla taskussa.</b> Näyttö pidetään kävelyn aikana automaattisesti päällä, jotta GPS ja tarinoiden automaattinen käynnistys toimivat luotettavasti. Älä sammuta näyttöä virtapainikkeesta.</p>
+</div></main>
+<script>const pts=[{"name": "Suomen ratsuväen muistomerkki", "lat": 61.059663, "lon": 28.180214, "audio": "01_patsas.mp3", "radius": 20}, {"name": "Rakuunamäen pääportti & Pave Maijanen", "lat": 61.059783, "lon": 28.178977, "audio": "02_paaportti.mp3", "radius": 30}, {"name": "Päävartiorakennus", "lat": 61.0591569, "lon": 28.1784266, "audio": "03_paavartio.mp3", "radius": 30}, {"name": "Pohjustus ennen Rakuunahotellia", "lat": 61.0593719, "lon": 28.177457, "audio": "04_pohjustus.mp3", "radius": 30}, {"name": "Hotelli Rakuuna", "lat": 61.059266, "lon": 28.17633415, "audio": "05_hotellirakuuna.mp3", "radius": 30}, {"name": "Sotilaskoti", "lat": 61.059182, "lon": 28.175187, "audio": "06_sotilaskoti.mp3", "radius": 30}, {"name": "Vanha ruokala", "lat": 61.0591133, "lon": 28.1737116, "audio": "07_ruokala.mp3", "radius": 30}, {"name": "Chymoksen portti", "lat": 61.058047, "lon": 28.173163, "audio": "08_chymosportti.mp3", "radius": 30}, {"name": "Chymos", "lat": 61.0580152, "lon": 28.1722136, "audio": "09_chymos.mp3", "radius": 30}, {"name": "Upseerikerho", "lat": 61.0591837, "lon": 28.1705692, "audio": "10_upseerikerho.mp3", "radius": 30}, {"name": "Tuju Taproom", "lat": 61.0594142, "lon": 28.1737352, "audio": "11_tuju.mp3", "radius": 30}, {"name": "Adolf Ehrnroothin aukio", "lat": 61.060096, "lon": 28.174944, "audio": "12_aukio.mp3", "radius": 45}];const aud=pts.map(p=>new Audio(p.audio));
+const startBtn=document.getElementById("start");
+const statusEl=document.getElementById("status");
+const listEl=document.getElementById("list");
+let done=new Set(),playing=false,started=false,wake,watchId=null;
+const routeBtn=document.getElementById("routeBtn");
+const routeBox=document.getElementById("routeBox");
+function d(a,b,c,e){const R=6371000,r=Math.PI/180,x=(e-b)*r*Math.cos((a+c)*r/2),y=(c-a)*r;return Math.sqrt(x*x+y*y)*R}
+function draw(){listEl.innerHTML=pts.map((p,i)=>`<div class="p ${done.has(i)?"done":""}">${done.has(i)?"✓ ":""}${i+1}. ${p.name} <small>(${p.radius} m)</small></div>`).join("")}
+let routeMap=null;
+function openRouteMap(){
+if(routeMap){setTimeout(()=>routeMap.invalidateSize(),50);return;}
+routeMap=L.map("routeMap",{scrollWheelZoom:false}).setView([61.0592,28.1758],16);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+maxZoom:19,
+attribution:"&copy; OpenStreetMap"
+}).addTo(routeMap);
+const line=pts.map(p=>[p.lat,p.lon]);
+L.polyline(line).addTo(routeMap);
+pts.forEach((p,i)=>{
+  if(i===0){
+    const startIcon=L.divIcon({
+      className:"",
+      html:'<div style="background:#2f7d45;color:white;padding:7px 10px;border-radius:16px;font-weight:800;font-size:12px;white-space:nowrap;box-shadow:0 2px 7px rgba(0,0,0,.45)">ALOITUS</div>',
+      iconSize:[68,30],iconAnchor:[34,15]
+    });
+    L.marker([p.lat,p.lon],{icon:startIcon}).addTo(routeMap).bindPopup(p.name);
+  } else if(i===pts.length-1){
+    const finishIcon=L.divIcon({
+      className:"",
+      html:'<div style="background:#8a6230;color:white;padding:7px 10px;border-radius:16px;font-weight:800;font-size:12px;white-space:nowrap;box-shadow:0 2px 7px rgba(0,0,0,.45)">MAALI</div>',
+      iconSize:[54,30],iconAnchor:[27,15]
+    });
+    L.marker([p.lat,p.lon],{icon:finishIcon}).addTo(routeMap).bindPopup(p.name);
+  } else {
+    L.circleMarker([p.lat,p.lon],{radius:6,weight:2,fillOpacity:.85}).addTo(routeMap).bindPopup(p.name);
+  }
+});
+routeMap.fitBounds(line,{padding:[22,22]});
+}
+routeBtn.onclick=()=>{
+const opening=routeBox.hidden;
+routeBox.hidden=!opening;
+routeBtn.textContent=opening?"Sulje reitti":"Näytä reitti";
+if(opening)setTimeout(openRouteMap,30);
+};
+async function awake(){try{if("wakeLock"in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&started)awake()});
+async function play(i){if(playing||done.has(i))return;playing=true;done.add(i);draw();let a=aud[i];a.currentTime=0;try{await a.play();statusEl.innerHTML=`<b>Kohde saavutettu!</b><br>${i+1}. ${pts[i].name}<br>Selostus soi.`}catch(e){statusEl.innerHTML=`<b>GPS laukesi:</b> ${pts[i].name}<br>Ääni ei käynnistynyt.`;playing=false}a.onended=()=>playing=false}
+async function stopWalk(){
+if(!started)return;
+started=false;
+if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+aud.forEach(a=>{a.pause();a.currentTime=0;});
+playing=false;
+if(wake){try{await wake.release()}catch(e){} wake=null;}
+startBtn.textContent="▶ Aloita kävely";
+statusEl.innerHTML="<b>Kävely lopetettu.</b><br>GPS-seuranta ei ole enää päällä.";
+}
+startBtn.onclick=async()=>{if(started){await stopWalk();return;}started=true;startBtn.textContent="■ Lopeta kävely";await awake();try{aud[0].muted=true;await aud[0].play();aud[0].pause();aud[0].currentTime=0;aud[0].muted=false}catch(e){}
+statusEl.textContent="GPS käynnistyy…";watchId=navigator.geolocation.watchPosition(pos=>{let n=-1,nd=Infinity;pts.forEach((p,i)=>{if(done.has(i))return;let x=d(pos.coords.latitude,pos.coords.longitude,p.lat,p.lon);if(x<nd){nd=x;n=i}});if(n<0){statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br><b>Kaikki 12 kohdetta kuunneltu.</b>`;return}let p=pts[n];statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m<br>Lähin kuuntelematon piste: <b>${n+1}. ${p.name}</b><br>Etäisyys: <b>${Math.round(nd)} m</b> · laukaisu ${p.radius} m`;if(nd<=p.radius&&!playing)play(n)},e=>statusEl.textContent="GPS-virhe: "+e.message,{enableHighAccuracy:true,maximumAge:0,timeout:15000})};draw();</script></body></html>
