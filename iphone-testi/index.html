@@ -1,2 +1,21 @@
 <!doctype html>
-<html lang="fi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lara HEVC + MP3 testi</title><style>*{box-sizing:border-box}body{margin:0;background:#101110;color:#fff;font-family:system-ui,-apple-system,sans-serif}main{max-width:680px;margin:auto;padding:20px}h1{font-size:27px;margin:0 0 8px}p{line-height:1.45;color:#ddd}button{width:100%;padding:15px;border:0;border-radius:12px;font-size:19px;font-weight:750;background:#a77b35;color:#fff;margin:10px 0 16px}.scene{position:relative;width:100%;overflow:hidden;border-radius:18px;background:#222}.bg{display:block;width:100%;height:auto}.lara{position:absolute;left:7%;bottom:0;width:50%;height:auto;pointer-events:none}.status{padding:12px;border-radius:12px;background:#1b1e1b;margin-top:12px;color:#ddd}</style></head><body><main><h1>Lara – HEVC iPhone-testi</h1><p>Paina Aloita testi. Tarkista, näkyykö Lara Putkan kuvan päällä ilman mustaa suorakulmiota.</p><button id="start">▶ Aloita testi</button><div class="scene"><img class="bg" src="putka.png" alt="Päävartio"><video id="lara" class="lara" playsinline muted preload="auto" aria-label="Lara"><source src="paavartio.hevc.mp4" type="video/mp4"></video></div><div id="status" class="status">Testi ei ole käynnissä.</div><audio id="audio" preload="auto" src="paavartio.mp3"></audio></main><script>const b=document.getElementById('start'),a=document.getElementById('audio'),v=document.getElementById('lara'),s=document.getElementById('status');b.onclick=async()=>{a.pause();v.pause();try{a.currentTime=0;v.currentTime=0}catch(e){}const results=await Promise.allSettled([v.play(),a.play()]);b.textContent='↻ Aloita uudelleen';s.textContent=results.every(r=>r.status==='fulfilled')?'Testi käynnissä – tarkista Laran tausta.':'Toistossa ongelma: '+results.map((r,i)=>r.status==='rejected'?(i===0?'Video: ':'Ääni: ')+r.reason.message:'').filter(Boolean).join(' / ')};a.onended=()=>{v.pause();s.textContent='Testi päättyi.'};v.onerror=()=>s.textContent='Videon lataus epäonnistui. Tarkista tiedostonimi ja että kaikki tiedostot ovat samassa kansiossa.';</script></body></html>
+<html lang="fi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lara HEVC äänen kanssa testi</title><style>*{box-sizing:border-box}body{margin:0;background:#101110;color:#fff;font-family:system-ui,-apple-system,sans-serif}main{max-width:680px;margin:auto;padding:20px}h1{font-size:27px;margin:0 0 8px}p{line-height:1.45;color:#ddd}button{width:100%;padding:15px;border:0;border-radius:12px;font-size:19px;font-weight:750;background:#a77b35;color:#fff;margin:10px 0 16px}.scene{position:relative;width:100%;overflow:hidden;border-radius:18px;background:#222}.bg{display:block;width:100%;height:auto}.lara{position:absolute;left:7%;bottom:0;width:50%;height:auto;pointer-events:none}.status{padding:12px;border-radius:12px;background:#1b1e1b;margin-top:12px;color:#ddd}</style></head><body><main><h1>Lara – HEVC iPhone-testi</h1><p>Paina Aloita testi. Laran liike ja puhe tulevat samasta HEVC-videosta.</p><button id="start">▶ Aloita testi</button><div class="scene"><img class="bg" src="putka.png" alt="Päävartio"><video id="lara" class="lara" playsinline preload="auto" aria-label="Lara"><source src="paavartio.hevc.mp4" type="video/mp4"></video></div><div id="status" class="status">Testi ei ole käynnissä.</div></main><script>
+const b=document.getElementById('start');
+const v=document.getElementById('lara');
+const s=document.getElementById('status');
+b.onclick=async()=>{
+  v.pause();
+  try {
+    v.currentTime=0;
+    v.muted=false;
+    v.volume=1;
+    await v.play();
+    b.textContent='↻ Aloita uudelleen';
+    s.textContent='Testi käynnissä – Laran kuva ja ääni tulevat samasta videosta.';
+  } catch(e) {
+    s.textContent='Videon käynnistys epäonnistui: '+e.message;
+  }
+};
+v.onended=()=>s.textContent='Testi päättyi.';
+v.onerror=()=>s.textContent='Videon lataus epäonnistui. Tarkista tiedostonimi.';
+</script></body></html>
