@@ -39,6 +39,7 @@ small{color:#9da29b}
 <div class="language-card unavailable" aria-label="Englanti, tulossa"><span class="language-flag">🇬🇧</span><span class="language-name">English</span><span class="language-state">Tulossa</span></div>
 <div class="language-card unavailable" aria-label="Saksa, tulossa"><span class="language-flag">🇩🇪</span><span class="language-name">Deutsch</span><span class="language-state">Tulossa</span></div>
 </div>
+<div class="gps-intro" style="border-color:#79542e;background:#261e14;color:#f5e4c9">📱 <b>Muista kävelyn aikana:</b> Pidä puhelimen näyttö päällä, jotta GPS-seuranta ja tarinat toimivat luotettavasti. Kävely yrittää pitää näytön automaattisesti hereillä.</div>
 <button id="start">▶ Aloita kävely</button>
 <button id="routeBtn" class="secondary">Näytä reitti</button>
 <div id="routeBox" class="route-box" hidden><div id="routeMap"></div></div>
@@ -46,7 +47,7 @@ small{color:#9da29b}
 <div id="gpsHelp" class="gps-help" hidden></div>
 <div class="route-title">Kävelyn kohteet</div>
 <div id="list"></div>
-<p class="note"><b>Puhelin voi olla taskussa.</b> Näyttö pidetään kävelyn aikana automaattisesti päällä, jotta GPS ja tarinoiden automaattinen käynnistys toimivat luotettavasti. Älä sammuta näyttöä virtapainikkeesta.</p>
+
 </div></main>
 <script>const pts=[{"name": "Suomen ratsuväen muistomerkki", "lat": 61.059663, "lon": 28.180214, "audio": "01_patsas.mp3", "radius": 20}, {"name": "Rakuunamäen pääportti & Pave Maijanen", "lat": 61.059783, "lon": 28.178977, "audio": "02_paaportti.mp3", "radius": 30}, {"name": "Päävartiorakennus", "lat": 61.0591569, "lon": 28.1784266, "audio": "03_paavartio.mp3", "radius": 30}, {"name": "Pohjustus ennen Rakuunahotellia", "lat": 61.0593719, "lon": 28.177457, "audio": "04_pohjustus.mp3", "radius": 30}, {"name": "Hotelli Rakuuna", "lat": 61.059266, "lon": 28.17633415, "audio": "05_hotellirakuuna.mp3", "radius": 30}, {"name": "Sotilaskoti", "lat": 61.059182, "lon": 28.175187, "audio": "06_sotilaskoti.mp3", "radius": 30}, {"name": "Vanha ruokala", "lat": 61.0591133, "lon": 28.1737116, "audio": "07_ruokala.mp3", "radius": 30}, {"name": "Chymoksen portti", "lat": 61.058047, "lon": 28.173163, "audio": "08_chymosportti.mp3", "radius": 30}, {"name": "Chymos", "lat": 61.0580152, "lon": 28.1722136, "audio": "09_chymos.mp3", "radius": 30}, {"name": "Upseerikerho", "lat": 61.0591837, "lon": 28.1705692, "audio": "10_upseerikerho.mp3", "radius": 30}, {"name": "Tuju Taproom", "lat": 61.0594142, "lon": 28.1737352, "audio": "11_tuju.mp3", "radius": 30}, {"name": "Adolf Ehrnroothin aukio", "lat": 61.060096, "lon": 28.174944, "audio": "12_aukio.mp3", "radius": 45}];const aud=pts.map(p=>new Audio(p.audio));
 let audioCtx=null,currentSource=null;
@@ -69,7 +70,7 @@ const routeBox=document.getElementById("routeBox");
 function d(a,b,c,e){const R=6371000,r=Math.PI/180,x=(e-b)*r*Math.cos((a+c)*r/2),y=(c-a)*r;return Math.sqrt(x*x+y*y)*R}
 function draw(){listEl.innerHTML=pts.map((p,i)=>`<div class="p ${done.has(i)?"done":""}">${done.has(i)?"✓ ":""}${i+1}. ${p.name}</div>`).join("")}
 let routeMap=null,userMarker=null,accuracyCircle=null,lastPosition=null;
-function updateUserPosition(){if(!routeMap||!lastPosition)return;const {lat,lon,accuracy}=lastPosition;const ll=[lat,lon];if(!userMarker){userMarker=L.circleMarker(ll,{radius:8,color:"#fff",weight:3,fillColor:"#1877f2",fillOpacity:1}).addTo(routeMap).bindPopup("Oma sijainti");accuracyCircle=L.circle(ll,{radius:accuracy,color:"#1877f2",weight:1,fillColor:"#1877f2",fillOpacity:.12}).addTo(routeMap)}else{userMarker.setLatLng(ll);accuracyCircle.setLatLng(ll);accuracyCircle.setRadius(accuracy)}}
+function updateUserPosition(){if(!routeMap||!lastPosition)return;const {lat,lon,accuracy}=lastPosition;const ll=[lat,lon];if(!userMarker){userMarker=L.circleMarker(ll,{radius:8,color:"#fff",weight:3,fillColor:"#e53935",fillOpacity:1}).addTo(routeMap).bindPopup("Oma sijainti");accuracyCircle=L.circle(ll,{radius:accuracy,color:"#1877f2",weight:1,fillColor:"#1877f2",fillOpacity:.12}).addTo(routeMap)}else{userMarker.setLatLng(ll);accuracyCircle.setLatLng(ll);accuracyCircle.setRadius(accuracy)}}
 function openRouteMap(){
 if(routeMap){setTimeout(()=>routeMap.invalidateSize(),50);return;}
 routeMap=L.map("routeMap",{scrollWheelZoom:false}).setView([61.0592,28.1758],16);
