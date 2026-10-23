@@ -128,29 +128,24 @@ footer{background:#241a15;color:#cdbb9d;text-align:center;padding:23px;font:13px
 <!-- Cloudflare Web Analytics -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"860f9fc6e8434b4bbf40f0dfd3e6b080"}'></script>
 <!-- End Cloudflare Web Analytics -->
-<!-- Painikelinkkien seuranta Cloudflaren SPA-sivunäkymillä.
-     Cloudflare ei tue varsinaisia mukautettuja tapahtumia: luvut ovat arvioita. -->
+<!-- Kävelypainikkeiden klikkausten tallennus Cloudflare Workeriin -->
 <script>
 (function () {
-  const originalPath = window.location.pathname;
+  const endpoint = 'https://historian-jaljilla-laskuri.javoju64.workers.dev/click';
   document.querySelectorAll('a[data-walk-track]').forEach(function (link) {
-    link.addEventListener('click', function (event) {
-      // Säilytetään Ctrl/Cmd-klikkaukset ja muut selaimen omat toiminnot.
-      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-      const target = link.getAttribute('target');
-      const url = link.href;
-      const trackPath = originalPath.replace(/\/?$/, '/') + 'seuranta/' + link.dataset.walkTrack;
-      if (target === '_blank') {
-        // Uusi välilehti avataan suoraan käyttäjän klikkauksesta.
-        // Nykyinen sivu jää auki, jolloin mittauksella on aikaa lähteä.
-        window.open(url, '_blank', 'noopener');
-        event.preventDefault();
-        history.pushState({ walkTrack: true }, '', trackPath);
-        setTimeout(function () { history.replaceState(null, '', originalPath); }, 1500);
-      } else {
-        event.preventDefault();
-        history.pushState({ walkTrack: true }, '', trackPath);
-        setTimeout(function () { window.location.assign(url); }, 700);
+    link.addEventListener('click', function () {
+      const walk = link.dataset.walkTrack;
+      // Lähetys ei estä linkin tavallista avaamista.
+      try {
+        fetch(endpoint, {
+          method: 'POST',
+          mode: 'cors',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ walk: walk })
+        }).catch(function () {});
+      } catch (error) {
+        // Seurannan epäonnistuminen ei estä kävelyn avaamista.
       }
     });
   });
