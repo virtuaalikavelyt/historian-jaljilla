@@ -89,8 +89,8 @@ footer{background:#241a15;color:#cdbb9d;text-align:center;padding:23px;font:13px
   <div class="card-body"><div class="location">Lappeenranta</div><h3>Rakuunamäki</h3>
    <p>Kulje historiallisen kasarmialueen läpi ja tutustu Rakuunamäen ratsuväkiperinteeseen, rakennuksiin ja tarinoihin.</p>
    <div class="buttons">
-    <a class="btn alt" href="rakuunamaki/">🎧 Äänikävely paikan päällä</a>
-     <a class="btn" href="https://virtuaalikavelyt.github.io/rakuunamaki-kavely/" target="_blank" rel="noopener">▶ Virtuaalinen kävely</a>
+    <a class="btn alt" href="rakuunamaki/" data-walk-track="rakuunamaki-aanikavely">🎧 Äänikävely paikan päällä</a>
+     <a class="btn" href="https://virtuaalikavelyt.github.io/rakuunamaki-kavely/" data-walk-track="rakuunamaki-virtuaali" target="_blank" rel="noopener">▶ Virtuaalinen kävely</a>
    </div>
    <div class="echoes-option">Vaihtoehtoisesti maksuttomalla Echoes-sovelluksella:<br>1. Lataa Echoes puhelimesi sovelluskaupasta.<br>2. Avaa Echoes-sovellus ja etsi lähialueen kävelyistä Rakuunamäki.</div>
   </div>
@@ -101,7 +101,7 @@ footer{background:#241a15;color:#cdbb9d;text-align:center;padding:23px;font:13px
   <div class="card-body"><div class="location">Lappeenranta</div><h3>Linnoitus</h3>
    <p>Kulje Linnoituksen kujilla ja valleilla ja kuuntele paikan tarinoita omaan tahtiisi.</p>
    <div class="buttons">
-    <a class="btn alt" href="linnoitus/">🎧 Äänikävely paikan päällä</a>
+    <a class="btn alt" href="linnoitus/" data-walk-track="linnoitus-aanikavely">🎧 Äänikävely paikan päällä</a>
    </div>
    <div class="echoes-option">Vaihtoehtoisesti maksuttomalla Echoes-sovelluksella:<br>1. Lataa Echoes puhelimesi sovelluskaupasta.<br>2. Avaa Echoes-sovellus ja etsi lähialueen kävelyistä Linnoitus.</div>
   </div>
@@ -128,4 +128,33 @@ footer{background:#241a15;color:#cdbb9d;text-align:center;padding:23px;font:13px
 <!-- Cloudflare Web Analytics -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"860f9fc6e8434b4bbf40f0dfd3e6b080"}'></script>
 <!-- End Cloudflare Web Analytics -->
+<!-- Painikelinkkien seuranta Cloudflaren SPA-sivunäkymillä.
+     Cloudflare ei tue varsinaisia mukautettuja tapahtumia: luvut ovat arvioita. -->
+<script>
+(function () {
+  const originalPath = window.location.pathname;
+  document.querySelectorAll('a[data-walk-track]').forEach(function (link) {
+    link.addEventListener('click', function (event) {
+      // Säilytetään Ctrl/Cmd-klikkaukset ja muut selaimen omat toiminnot.
+      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const target = link.getAttribute('target');
+      const url = link.href;
+      const trackPath = originalPath.replace(/\/?$/, '/') + 'seuranta/' + link.dataset.walkTrack;
+      if (target === '_blank') {
+        // Uusi välilehti avataan suoraan käyttäjän klikkauksesta.
+        // Nykyinen sivu jää auki, jolloin mittauksella on aikaa lähteä.
+        window.open(url, '_blank', 'noopener');
+        event.preventDefault();
+        history.pushState({ walkTrack: true }, '', trackPath);
+        setTimeout(function () { history.replaceState(null, '', originalPath); }, 1500);
+      } else {
+        event.preventDefault();
+        history.pushState({ walkTrack: true }, '', trackPath);
+        setTimeout(function () { window.location.assign(url); }, 700);
+      }
+    });
+  });
+})();
+</script>
+
 </body></html>
