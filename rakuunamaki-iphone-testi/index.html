@@ -41,6 +41,7 @@ small{color:#9da29b}
 </div>
 <div class="gps-intro" style="border-color:#79542e;background:#261e14;color:#f5e4c9">📱 <b>Puhelin voi olla taskussa.</b> Näyttö pidetään kävelyn aikana automaattisesti päällä, jotta GPS ja tarinoiden automaattinen käynnistys toimivat luotettavasti. Älä sammuta näyttöä virtapainikkeesta.</div>
 <button id="start">▶ Aloita kävely</button>
+<button id="pauseBtn" class="secondary" hidden>⏸ Tauko</button>
 <button id="routeBtn" class="secondary">Näytä reitti</button>
 <div id="routeBox" class="route-box" hidden><div id="routeMap"></div></div>
 <div id="status">Kävely ei ole vielä käynnissä.</div>
@@ -61,6 +62,8 @@ async function preloadAllAudio(){
   return allAudioReady;
 }
 const startBtn=document.getElementById("start");
+const pauseBtn=document.getElementById("pauseBtn");
+let paused=false, recoveringGps=false, gpsWatchGeneration=0, lastGpsUpdate=0;
 const statusEl=document.getElementById("status");
 const listEl=document.getElementById("list");
 let done=new Set(),playing=false,started=false,wake,watchId=null;
@@ -109,16 +112,28 @@ routeBtn.textContent=opening?"Sulje reitti":"Näytä reitti";
 if(opening)setTimeout(openRouteMap,30);
 };
 async function awake(){try{if("wakeLock"in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&started)awake()});
-function enqueueStory(i){if(done.has(i)||queued.has(i))return;queued.add(i);audioQueue.push(i);runQueue()}
+// iOS may suspend geolocation when Safari goes into the background.
+// Restart the watcher after returning, without resetting completed stories.
+document.addEventListener("visibilitychange",async()=>{
+  if(document.visibilityState!=="visible"||!started)return;
+  await awake();
+  if(paused)return;
+  restartGpsWatch();
+  if(audioCtx&&audioCtx.state==="suspended"){
+    // iOS may require a tap to resume audio; the Jatka button handles that.
+    try{await audioCtx.resume()}catch(e){}
+  }
+});
+function enqueueStory(i){if(paused||!started||done.has(i)||queued.has(i))return;queued.add(i);audioQueue.push(i);runQueue()}
 async function runQueue(){
-if(playing||!started||!audioQueue.length)return;
+if(playing||paused||!started||!audioQueue.length)return;
 const i=audioQueue.shift();
 playing=true;
 try{
 await ensureAudioContext();
 const buf=audioBuffers.get(i)||await preloadAudio(i);
 if(!started){playing=false;queued.delete(i);return}
+ if(paused&&audioCtx.state==="running")await audioCtx.suspend()
 const source=audioCtx.createBufferSource();source.buffer=buf;source.connect(audioCtx.destination);currentSource=source;
 source.onended=()=>{if(currentSource!==source)return;currentSource=null;playing=false;runQueue()};
 source.start(0);done.add(i);queued.delete(i);draw();
@@ -140,7 +155,7 @@ function isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator
 function showGpsHelp(err){
   startBtn.textContent="▶ Yritä uudelleen";
   if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
-  started=false;
+  started=false;pauseBtn.hidden=true;gpsWatchGeneration++;
   let msg="";
   if(isIOS()){
     msg=`<b>Sijainti tarvitaan äänikävelyyn.</b><br>
@@ -156,7 +171,7 @@ function showGpsHelp(err){
   gpsHelp.hidden=false;
   statusEl.innerHTML="<b>Sijaintilupa tarvitaan.</b><br>Salli sijainnin käyttö ja paina sitten Yritä uudelleen.";
 }
-startBtn.onclick=async()=>{if(started){await stopWalk();return;}gpsHelp.hidden=true;started=true;startBtn.textContent="■ Lopeta kävely";await awake();try{
+startBtn.onclick=async()=>{if(started){await stopWalk();return;}gpsHelp.hidden=true;started=true;paused=false;pauseBtn.hidden=false;pauseBtn.textContent="⏸ Tauko";startBtn.textContent="■ Lopeta kävely";await awake();try{
   await ensureAudioContext();
   const silent=audioCtx.createBuffer(1,1,22050);
   const src=audioCtx.createBufferSource();src.buffer=silent;src.connect(audioCtx.destination);src.start(0);
@@ -169,12 +184,22 @@ startBtn.onclick=async()=>{if(started){await stopWalk();return;}gpsHelp.hidden=t
     return;
   }
 }catch(e){
-  started=false;
+  started=false;pauseBtn.hidden=true;
   startBtn.textContent="▶ Yritä uudelleen";
   statusEl.innerHTML="<b>Äänien valmistelu epäonnistui.</b><br>Paina Yritä uudelleen.";
   return;
 }
-statusEl.innerHTML="<b>Kaikki 12 tarinaa ladattu.</b><br>GPS käynnistyy…";watchId=navigator.geolocation.watchPosition(pos=>{
+statusEl.innerHTML="<b>Kaikki 12 tarinaa ladattu.</b><br>GPS käynnistyy…";restartGpsWatch()};draw();
+
+function restartGpsWatch(){
+ if(!started||paused||recoveringGps)return;
+ recoveringGps=true;
+ if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+ const generation=++gpsWatchGeneration;
+ statusEl.innerHTML="📍 Päivitetään GPS-sijaintia… Odota tarkentumista ennen seuraavaa tarinaa.";
+ watchId=navigator.geolocation.watchPosition(pos=>{
+ if(generation!==gpsWatchGeneration||!started||paused)return;
+ lastGpsUpdate=Date.now();
 lastPosition={lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy};updateUserPosition();
 // Epätarkkaa sijaintia ei käytetä tarinoiden laukaisemiseen.
 const GPS_MAX_ACCURACY=30;
@@ -198,7 +223,28 @@ if(nd<=p.radius)enqueueStory(n);
   if(!started)return;
   if(err&&err.code===1){showGpsHelp(err);return;} // Sijaintilupa estetty.
   statusEl.innerHTML="⚠️ GPS:n sijaintitieto katkesi hetkeksi. Odotetaan uutta sijaintia…<br>Pidä sivu näkyvissä ja Tarkka sijainti päällä. Kävely jatkuu automaattisesti, kun paikannus palautuu.";
-},{enableHighAccuracy:true,maximumAge:0,timeout:15000})};draw();</script>
+},{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+ recoveringGps=false;
+}
+
+pauseBtn.onclick=async()=>{
+ if(!started)return;
+ if(!paused){
+   paused=true;
+   pauseBtn.textContent="▶ Jatka";
+   if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+   gpsWatchGeneration++;
+   if(audioCtx&&audioCtx.state==="running")try{await audioCtx.suspend()}catch(e){}
+   statusEl.innerHTML="⏸ Kävely tauolla. Tarina jatkuu samasta kohdasta, kun painat Jatka.";
+ }else{
+   paused=false;
+   pauseBtn.textContent="⏸ Tauko";
+   try{await ensureAudioContext()}catch(e){statusEl.textContent="Ääni ei jatkunut. Napauta Jatka uudelleen.";}
+   restartGpsWatch();
+   runQueue();
+ }
+};
+</script>
 <!-- Cloudflare Web Analytics -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"860f9fc6e8434b4bf40f0dfd3e6b080"}'></script>
 <!-- End Cloudflare Web Analytics -->
