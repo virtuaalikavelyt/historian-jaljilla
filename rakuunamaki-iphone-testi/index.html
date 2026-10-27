@@ -81,27 +81,10 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
 maxZoom:19,
 attribution:"&copy; OpenStreetMap"
 }).addTo(routeMap);
-// Käsin hahmoteltu kävelyreitti käyttäjän punaisen karttapiirroksen mukaan.
-// Kulkupisteet ovat alustavia; ne eivät muuta tarinoiden GPS-laukaisupisteitä.
-const stop=i=>[pts[i].lat,pts[i].lon];
-const line=[
-  stop(0),
-  [61.05959,28.17955], [61.05925,28.17948], // lähtö ja käännös kasarmialueelle
-  stop(1),
-  [61.05930,28.17883], stop(2), // päävartion kohdalla pieni paluu
-  [61.05931,28.17883], [61.05934,28.17780], stop(3),
-  [61.05930,28.17750], stop(4),
-  [61.05922,28.17595], stop(5),
-  [61.05916,28.17450], stop(6),
-  [61.05918,28.17440], [61.05840,28.17440], // ruokalalta palataan ja käännytään etelään
-  [61.05802,28.17415], [61.05795,28.17355], // Stugen kautta (ei erillistä tarinaa)
-  stop(7),
-  [61.05812,28.17265], stop(8),
-  [61.05842,28.17208], [61.05910,28.17185], stop(9),
-  [61.05926,28.17190], [61.05929,28.17310], stop(10),
-  [61.05940,28.17430], [61.05986,28.17480], stop(11)
-];
-L.polyline(line,{color:'#d73b35',weight:5,opacity:0.9,lineJoin:'round'}).addTo(routeMap);
+// Kävelyreitti: käyttäjän uMapissa piirtämä GeoJSON (18 pistettä).
+// Reittiviiva ei muuta tarinoiden GPS-laukaisupisteitä.
+const line=[[61.059563,28.180007],[61.059781,28.178869],[61.059734,28.178204],[61.059126,28.178419],[61.059376,28.178279],[61.0591,28.173763],[61.059111,28.174524],[61.058322,28.17461],[61.058192,28.173645],[61.058005,28.172958],[61.058047,28.172035],[61.058275,28.171134],[61.058628,28.170705],[61.059261,28.170662],[61.0595,28.174503],[61.059718,28.174524],[61.059749,28.174825],[61.060019,28.174889]];
+L.polyline(line,{color:"#d73b35",weight:5,opacity:0.9,lineJoin:"round"}).addTo(routeMap);
 pts.forEach((p,i)=>{
   if(i===0){
     const startIcon=L.divIcon({
