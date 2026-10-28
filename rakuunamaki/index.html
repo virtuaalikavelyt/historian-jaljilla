@@ -26,6 +26,17 @@ small{color:#9da29b}
 .language-name{font-size:13px;font-weight:750;display:block}
 .language-state{font-size:11px;color:#dfc88f;display:block;margin-top:4px}
 .gps-intro{font-size:14px;line-height:1.5;padding:12px;margin:3px 0 12px;border:1px solid #3f5147;border-radius:12px;background:#142019;color:#d5e5d5}
+
+/* Kartan laajennettu näkymä: toimii myös iOS Safarissa ilman Fullscreen APIa. */
+.route-box{position:relative}
+.map-controls{position:absolute;z-index:1100;right:16px;top:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.map-controls button{width:auto;margin:0;padding:11px 13px;font-size:14px;background:#1e2722;border:2px solid #fff;color:white;box-shadow:0 2px 10px #0008}
+#mapPauseBtn{background:#9a7135}
+#mapPauseBtn[hidden]{display:none}
+.route-box.map-expanded{position:fixed;inset:0;z-index:9999;margin:0;border:0;border-radius:0;padding:0;background:#101210}
+.route-box.map-expanded #routeMap{height:100dvh;min-height:100vh;border-radius:0}
+.route-box.map-expanded .map-controls{top:calc(env(safe-area-inset-top, 0px) + 14px);right:calc(env(safe-area-inset-right, 0px) + 14px)}
+body.map-open{overflow:hidden}
 </style></head>
 <body><main><div class="card">
 <div class="brand">Historian jäljillä</div>
@@ -41,8 +52,9 @@ small{color:#9da29b}
 </div>
 <div class="gps-intro" style="border-color:#79542e;background:#261e14;color:#f5e4c9">📱 <b>Puhelin voi olla taskussa.</b> Näyttö pidetään kävelyn aikana automaattisesti päällä, jotta GPS ja tarinoiden automaattinen käynnistys toimivat luotettavasti. Älä sammuta näyttöä virtapainikkeesta.</div>
 <button id="start">▶ Aloita kävely</button>
+<button id="pauseBtn" class="secondary" hidden>⏸ Tauko</button>
 <button id="routeBtn" class="secondary">Näytä reitti</button>
-<div id="routeBox" class="route-box" hidden><div id="routeMap"></div></div>
+<div id="routeBox" class="route-box" hidden><div id="routeMap"></div><div class="map-controls"><button id="expandMapBtn" type="button">⛶ Suuri kartta</button><button id="mapPauseBtn" type="button" hidden>⏸ Tauko</button></div></div>
 <div id="status">Kävely ei ole vielä käynnissä.</div>
 <div id="gpsHelp" class="gps-help" hidden></div>
 <div class="route-title">Kävelyn kohteet</div>
@@ -61,12 +73,29 @@ async function preloadAllAudio(){
   return allAudioReady;
 }
 const startBtn=document.getElementById("start");
+const pauseBtn=document.getElementById("pauseBtn");
+let paused=false, recoveringGps=false, gpsWatchGeneration=0, lastGpsUpdate=0;
 const statusEl=document.getElementById("status");
 const listEl=document.getElementById("list");
 let done=new Set(),playing=false,started=false,wake,watchId=null;
 let audioQueue=[],queued=new Set();
 const routeBtn=document.getElementById("routeBtn");
 const routeBox=document.getElementById("routeBox");
+const expandMapBtn=document.getElementById("expandMapBtn");
+const mapPauseBtn=document.getElementById("mapPauseBtn");
+function refreshMapPause(){mapPauseBtn.hidden=!started;mapPauseBtn.textContent=paused?"▶ Jatka":"⏸ Tauko"}
+function closeExpandedMap(){
+ routeBox.classList.remove("map-expanded");document.body.classList.remove("map-open");
+ expandMapBtn.textContent="⛶ Suuri kartta";
+ if(routeMap)setTimeout(()=>routeMap.invalidateSize(),80);
+}
+expandMapBtn.onclick=()=>{
+ if(routeBox.classList.contains("map-expanded")){closeExpandedMap();return;}
+ routeBox.classList.add("map-expanded");document.body.classList.add("map-open");
+ expandMapBtn.textContent="✕ Sulje suuri kartta";refreshMapPause();
+ if(routeMap)setTimeout(()=>routeMap.invalidateSize(),80);
+};
+mapPauseBtn.onclick=()=>pauseBtn.click();
 function d(a,b,c,e){const R=6371000,r=Math.PI/180,x=(e-b)*r*Math.cos((a+c)*r/2),y=(c-a)*r;return Math.sqrt(x*x+y*y)*R}
 function draw(){listEl.innerHTML=pts.map((p,i)=>`<div class="p ${done.has(i)?"done":""}">${done.has(i)?"✓ ":""}${i+1}. ${p.name}</div>`).join("")}
 let routeMap=null,userMarker=null,accuracyCircle=null,lastPosition=null;
@@ -78,8 +107,10 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
 maxZoom:19,
 attribution:"&copy; OpenStreetMap"
 }).addTo(routeMap);
-const line=pts.map(p=>[p.lat,p.lon]);
-L.polyline(line).addTo(routeMap);
+// Kävelyreitti: käyttäjän uMapissa piirtämä GeoJSON (18 pistettä).
+// Reittiviiva ei muuta tarinoiden GPS-laukaisupisteitä.
+const line=[[61.059563,28.180007],[61.059781,28.178869],[61.059734,28.178204],[61.059126,28.178419],[61.059376,28.178279],[61.0591,28.173763],[61.059111,28.174524],[61.058322,28.17461],[61.058192,28.173645],[61.058005,28.172958],[61.058047,28.172035],[61.058275,28.171134],[61.058628,28.170705],[61.059261,28.170662],[61.0595,28.174503],[61.059718,28.174524],[61.059749,28.174825],[61.060019,28.174889]];
+L.polyline(line,{color:"#1565e8",weight:5,opacity:0.95,lineJoin:"round"}).addTo(routeMap);
 pts.forEach((p,i)=>{
   if(i===0){
     const startIcon=L.divIcon({
@@ -105,20 +136,34 @@ updateUserPosition();
 routeBtn.onclick=()=>{
 const opening=routeBox.hidden;
 routeBox.hidden=!opening;
+if(!opening)closeExpandedMap();
+refreshMapPause();
 routeBtn.textContent=opening?"Sulje reitti":"Näytä reitti";
 if(opening)setTimeout(openRouteMap,30);
 };
 async function awake(){try{if("wakeLock"in navigator)wake=await navigator.wakeLock.request("screen")}catch(e){}}
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&started)awake()});
-function enqueueStory(i){if(done.has(i)||queued.has(i))return;queued.add(i);audioQueue.push(i);runQueue()}
+// iOS may suspend geolocation when Safari goes into the background.
+// Restart the watcher after returning, without resetting completed stories.
+document.addEventListener("visibilitychange",async()=>{
+  if(document.visibilityState!=="visible"||!started)return;
+  await awake();
+  if(paused)return;
+  restartGpsWatch();
+  if(audioCtx&&audioCtx.state==="suspended"){
+    // iOS may require a tap to resume audio; the Jatka button handles that.
+    try{await audioCtx.resume()}catch(e){}
+  }
+});
+function enqueueStory(i){if(paused||!started||done.has(i)||queued.has(i))return;queued.add(i);audioQueue.push(i);runQueue()}
 async function runQueue(){
-if(playing||!started||!audioQueue.length)return;
+if(playing||paused||!started||!audioQueue.length)return;
 const i=audioQueue.shift();
 playing=true;
 try{
 await ensureAudioContext();
 const buf=audioBuffers.get(i)||await preloadAudio(i);
 if(!started){playing=false;queued.delete(i);return}
+ if(paused&&audioCtx.state==="running")await audioCtx.suspend()
 const source=audioCtx.createBufferSource();source.buffer=buf;source.connect(audioCtx.destination);currentSource=source;
 source.onended=()=>{if(currentSource!==source)return;currentSource=null;playing=false;runQueue()};
 source.start(0);done.add(i);queued.delete(i);draw();
@@ -140,7 +185,7 @@ function isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator
 function showGpsHelp(err){
   startBtn.textContent="▶ Yritä uudelleen";
   if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
-  started=false;
+  started=false;pauseBtn.hidden=true;gpsWatchGeneration++;refreshMapPause();
   let msg="";
   if(isIOS()){
     msg=`<b>Sijainti tarvitaan äänikävelyyn.</b><br>
@@ -156,7 +201,7 @@ function showGpsHelp(err){
   gpsHelp.hidden=false;
   statusEl.innerHTML="<b>Sijaintilupa tarvitaan.</b><br>Salli sijainnin käyttö ja paina sitten Yritä uudelleen.";
 }
-startBtn.onclick=async()=>{if(started){await stopWalk();return;}gpsHelp.hidden=true;started=true;startBtn.textContent="■ Lopeta kävely";await awake();try{
+startBtn.onclick=async()=>{if(started){await stopWalk();return;}gpsHelp.hidden=true;started=true;paused=false;pauseBtn.hidden=false;pauseBtn.textContent="⏸ Tauko";refreshMapPause();startBtn.textContent="■ Lopeta kävely";await awake();try{
   await ensureAudioContext();
   const silent=audioCtx.createBuffer(1,1,22050);
   const src=audioCtx.createBufferSource();src.buffer=silent;src.connect(audioCtx.destination);src.start(0);
@@ -169,14 +214,67 @@ startBtn.onclick=async()=>{if(started){await stopWalk();return;}gpsHelp.hidden=t
     return;
   }
 }catch(e){
-  started=false;
+  started=false;pauseBtn.hidden=true;
   startBtn.textContent="▶ Yritä uudelleen";
   statusEl.innerHTML="<b>Äänien valmistelu epäonnistui.</b><br>Paina Yritä uudelleen.";
   return;
 }
-statusEl.innerHTML="<b>Kaikki 12 tarinaa ladattu.</b><br>GPS käynnistyy…";watchId=navigator.geolocation.watchPosition(pos=>{
+statusEl.innerHTML="<b>Kaikki 12 tarinaa ladattu.</b><br>GPS käynnistyy…";restartGpsWatch()};draw();
+
+function restartGpsWatch(){
+ if(!started||paused||recoveringGps)return;
+ recoveringGps=true;
+ if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+ const generation=++gpsWatchGeneration;
+ statusEl.innerHTML="📍 Päivitetään GPS-sijaintia… Odota tarkentumista ennen seuraavaa tarinaa.";
+ watchId=navigator.geolocation.watchPosition(pos=>{
+ if(generation!==gpsWatchGeneration||!started||paused)return;
+ lastGpsUpdate=Date.now();
 lastPosition={lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy};updateUserPosition();
-const accuracyHint=pos.coords.accuracy>100?"<br>⚠️ Sijainti on epätarkka. Tarkista, että Tarkka sijainti on päällä, ja odota hetki avoimessa paikassa.":"";let n=-1,nd=Infinity;pts.forEach((p,i)=>{if(done.has(i)||queued.has(i))return;let x=d(pos.coords.latitude,pos.coords.longitude,p.lat,p.lon);if(x<nd){nd=x;n=i}});if(n<0){statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m${accuracyHint}<br><b>Kaikki 12 kohdetta kuunneltu.</b>`;return}let p=pts[n];statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(pos.coords.accuracy)} m${accuracyHint}<br>Lähin kuuntelematon piste: <b>${n+1}. ${p.name}</b><br>Etäisyys: <b>${Math.round(nd)} m</b> · laukaisu ${p.radius} m`;if(nd<=p.radius)enqueueStory(n)},e=>showGpsHelp(e),{enableHighAccuracy:true,maximumAge:0,timeout:15000})};draw();</script>
+// Epätarkkaa sijaintia ei käytetä tarinoiden laukaisemiseen.
+const GPS_MAX_ACCURACY=30;
+const accuracy=pos.coords.accuracy;
+if(!Number.isFinite(accuracy)||accuracy>GPS_MAX_ACCURACY){
+  statusEl.innerHTML=`GPS-tarkkuus: noin ${Number.isFinite(accuracy)?Math.round(accuracy)+" m":"ei vielä tiedossa"}<br>⚠️ Odotetaan tarkempaa sijaintia (tavoite enintään ${GPS_MAX_ACCURACY} m). Tarinoita ei käynnistetä vielä. Pidä Tarkka sijainti päällä ja odota avoimessa paikassa.`;
+  return;
+}
+let n=-1,nd=Infinity;
+pts.forEach((p,i)=>{
+  if(done.has(i)||queued.has(i))return;
+  const x=d(pos.coords.latitude,pos.coords.longitude,p.lat,p.lon);
+  if(x<nd){nd=x;n=i}
+});
+if(n<0){statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(accuracy)} m<br><b>Kaikki 12 kohdetta käyty.</b>`;return}
+const p=pts[n];
+statusEl.innerHTML=`GPS-tarkkuus: noin ${Math.round(accuracy)} m<br>Lähin kuuntelematon piste: <b>${n+1}. ${p.name}</b><br>Etäisyys: <b>${Math.round(nd)} m</b> · laukaisu ${p.radius} m`;
+if(nd<=p.radius)enqueueStory(n);
+},err=>{
+  // Tilapäinen paikannuskatko ei saa nollata kävelyä tai jo kuunneltuja tarinoita.
+  if(!started)return;
+  if(err&&err.code===1){showGpsHelp(err);return;} // Sijaintilupa estetty.
+  statusEl.innerHTML="⚠️ GPS:n sijaintitieto katkesi hetkeksi. Odotetaan uutta sijaintia…<br>Pidä sivu näkyvissä ja Tarkka sijainti päällä. Kävely jatkuu automaattisesti, kun paikannus palautuu.";
+},{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+ recoveringGps=false;
+}
+
+pauseBtn.onclick=async()=>{
+ if(!started)return;
+ if(!paused){
+   paused=true;
+   pauseBtn.textContent="▶ Jatka";refreshMapPause();
+   if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+   gpsWatchGeneration++;
+   if(audioCtx&&audioCtx.state==="running")try{await audioCtx.suspend()}catch(e){}
+   statusEl.innerHTML="⏸ Kävely tauolla. Tarina jatkuu samasta kohdasta, kun painat Jatka.";
+ }else{
+   paused=false;
+   pauseBtn.textContent="⏸ Tauko";refreshMapPause();
+   try{await ensureAudioContext()}catch(e){statusEl.textContent="Ääni ei jatkunut. Napauta Jatka uudelleen.";}
+   restartGpsWatch();
+   runQueue();
+ }
+};
+</script>
 <!-- Cloudflare Web Analytics -->
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"860f9fc6e8434b4bf40f0dfd3e6b080"}'></script>
 <!-- End Cloudflare Web Analytics -->
