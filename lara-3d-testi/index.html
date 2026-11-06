@@ -127,18 +127,36 @@ if(holder){
  holder.appendChild(renderer.domElement);
  scene.add(new THREE.HemisphereLight(0xffffff,0x64748b,2.6));
  const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(2,5,4);scene.add(light);
- let mixer=null,clock=new THREE.Clock();
+ let mixer=null,clock=new THREE.Clock(),model=null,wrapper=null,frameCount=0;
+ // Pidä animoitu hahmo keskitettynä muuttamatta animaation ohjaamaa mallin sijaintia.
+ function fitLara(){
+   if(!model||!wrapper)return;
+   wrapper.scale.setScalar(1);wrapper.position.set(0,0,0);
+   model.updateMatrixWorld(true);
+   const bounds=new THREE.Box3().setFromObject(model);
+   if(bounds.isEmpty())return;
+   const size=bounds.getSize(new THREE.Vector3());
+   const center=bounds.getCenter(new THREE.Vector3());
+   const scale=1.25/Math.max(size.y,0.001);
+   wrapper.scale.setScalar(scale);
+   wrapper.position.set(-center.x*scale,-bounds.min.y*scale,-center.z*scale);
+ }
  new GLTFLoader().load("hahmo-meshy_ai_rigged_female_character_20261105_animated_mixamo_all_animation.glb",gltf=>{
-   const model=gltf.scene;
-   const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());
-   const wrapper=new THREE.Group();
-   if(size.y>0){const k=1.25/size.y;wrapper.scale.setScalar(k);model.position.set(-center.x,-bounds.min.y,-center.z)}
-   wrapper.add(model);scene.add(wrapper);
+   model=gltf.scene;
+   wrapper=new THREE.Group();wrapper.add(model);scene.add(wrapper);
    const clips=gltf.animations||[];
    const walking=clips.find(a=>/walk/i.test(a.name))||clips[0];
-   if(walking){mixer=new THREE.AnimationMixer(model);mixer.clipAction(walking).play()}
+   if(walking){mixer=new THREE.AnimationMixer(model);mixer.clipAction(walking).play();mixer.update(0.01)}
+   fitLara();
    holder.title='Lara 3D – '+(walking?walking.name:'ei animaatiota');
  },undefined,e=>{console.error('GLB-Laran lataus epäonnistui',e);holder.textContent='⚠️ GLB ei latautunut';});
- function frame(){requestAnimationFrame(frame);const dt=clock.getDelta();if(mixer&&!window.laraPaused)mixer.update(dt);renderer.render(scene,camera)}frame();
+ function frame(){
+   requestAnimationFrame(frame);
+   const dt=clock.getDelta();
+   if(mixer&&!window.laraPaused)mixer.update(dt);
+   if(model&&++frameCount%12===0)fitLara();
+   renderer.render(scene,camera);
+ }
+ frame();
 }
 </script></body></html>
