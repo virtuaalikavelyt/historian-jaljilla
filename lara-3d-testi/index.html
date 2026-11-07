@@ -186,21 +186,13 @@ if(holder){
    lastPos={lat:pos.lat,lng:pos.lng};
    const walkingNow=!!window.laraWalking && !window.laraPaused;
    if(action){
-     // Rauhallisempi askellus; reitin etenemisnopeus säilyy ennallaan.
-     action.timeScale=0.90;
-     // Noin 0,4 sekunnin pehmennys liikkeelle ja pysähdyksiin.
-     const previousBlend=walkBlend;
-     const target=walkingNow?1:0;
-     const change=Math.min(Math.abs(target-walkBlend),dt/0.4);
-     walkBlend+=Math.sign(target-walkBlend)*change;
-     action.paused=false;
-     action.enabled=true;
-     action.setEffectiveWeight(walkBlend);
-     if(walkBlend>0){mixer.update(dt);}
-     else if(previousBlend>0){
-       action.reset().play();
-       action.setEffectiveWeight(0);
-       mixer.update(0);
+     if(walkingNow){
+       action.paused=false;
+       mixer.update(dt);
+     }else if(wasWalking){
+       // Pysäytys palauttaa seisoma-asentoon, ei jätä askelta kesken.
+       action.paused=false;action.reset().play();mixer.update(0);
+       action.paused=true;
      }
    }
    wasWalking=walkingNow;
