@@ -128,6 +128,11 @@ if(holder){
  scene.add(new THREE.HemisphereLight(0xffffff,0x64748b,2.6));
  const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(2,5,4);scene.add(light);
  let mixer=null,clock=new THREE.Clock(),model=null,wrapper=null,frameCount=0;
+ // Karttaliikkeen seuranta: suunta muuttuu vain kun merkki todella liikkuu.
+ let lastPos=null, lastMoveAt=0, facing=0;
+ const facingGroup=new THREE.Group();scene.add(facingGroup);
+ const facingOffset=Math.PI; // Mallin etusuunta; voidaan hienosäätää testin jälkeen.
+ const turnSpeed=5;
  // Pidä animoitu hahmo keskitettynä muuttamatta animaation ohjaamaa mallin sijaintia.
  function fitLara(){
    if(!model||!wrapper)return;
@@ -143,7 +148,7 @@ if(holder){
  }
  new GLTFLoader().load("hahmo-meshy_ai_rigged_female_character_20261105_animated_mixamo_all_animation.glb",gltf=>{
    model=gltf.scene;
-   wrapper=new THREE.Group();wrapper.add(model);scene.add(wrapper);
+   wrapper=new THREE.Group();wrapper.add(model);facingGroup.add(wrapper);
    const clips=gltf.animations||[];
    const walking=clips.find(a=>/walk/i.test(a.name))||clips[0];
    if(walking){mixer=new THREE.AnimationMixer(model);mixer.clipAction(walking).play();mixer.update(0.01)}
@@ -153,8 +158,26 @@ if(holder){
  function frame(){
    requestAnimationFrame(frame);
    const dt=clock.getDelta();
-   if(mixer&&!window.laraPaused)mixer.update(dt);
-   if(model&&++frameCount%12===0)fitLara();
+   const pos=marker.getLatLng();
+   const now=performance.now();
+   if(lastPos){
+     const east=(pos.lng-lastPos.lng)*Math.cos(pos.lat*Math.PI/180);
+     const north=pos.lat-lastPos.lat;
+     if(Math.hypot(east,north)>0.000000015){
+       // Three.js-hahmon Y-kierto; kartalla pohjoinen ylös, itä oikealle.
+       facing=Math.atan2(east,north)+facingOffset;
+       lastMoveAt=now;
+     }
+   }
+   lastPos={lat:pos.lat,lng:pos.lng};
+   const moving=now-lastMoveAt<220 && !window.laraPaused;
+   if(mixer && moving)mixer.update(dt);
+   if(model){
+     // Pehmeä kääntyminen ilman äkillistä pyörähdystä.
+     let diff=Math.atan2(Math.sin(facing-facingGroup.rotation.y),Math.cos(facing-facingGroup.rotation.y));
+     facingGroup.rotation.y+=Math.sign(diff)*Math.min(Math.abs(diff),dt*turnSpeed);
+     if(++frameCount%12===0)fitLara();
+   }
    renderer.render(scene,camera);
  }
  frame();
