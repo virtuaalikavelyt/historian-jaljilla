@@ -5,7 +5,7 @@
 <div id="map"></div><div class="controls"><button onclick="startShow()">▶ Katso virtuaaliesittely</button><button class="pausebtn" id="pausebtn" onclick="togglePause()">⏸ Tauko</button><button onclick="stopAll()">⏹ Pysäytä</button><button class="fsbtn" id="fsbtn" onclick="toggleFullscreen()">⛶ Koko näyttö</button></div><div class="info"><b id="t">Tervetuloa virtuaalikävelylle</b><div id="d">Tutustu kohteisiin virtuaalisesti. Paina Aloita virtuaaliesittely.</div></div>
 <div class="modal" id="modal"><div class="box" id="box"><video class="bg" id="bg" autoplay loop muted playsinline></video><button class="close" onclick="auto=false;closeModal()">✕</button><button class="pausebtn" id="modalpause" style="position:absolute;top:12px;left:12px;z-index:22" onclick="togglePause()">⏸ Tauko</button><button class="fsbtn fsmodal" id="fsmodal" onclick="toggleFullscreen()" aria-label="Koko näyttö">⛶</button><canvas class="dualcanvas" id="dualcanvas" width="540" height="960"></canvas><video id="dualvideo" playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nofullscreen nodownload noremoteplayback" style="position:absolute;width:2px;height:2px;opacity:.01;pointer-events:none"></video><video class="avatar" id="av" autoplay controls playsinline></video><div class="panel" id="panel"><b id="mt"></b><div id="md"></div></div></div></div><audio id="audio"></audio>
 <script>
-const pts=[{"nimi":"Rakuunapatsas","kuvaus":"","lat":61.0623877,"lng":28.1840998,"kuva":"01-tausta-valaistu-rakuunapatsas-iltahamarassa.png","video":"01-avatar-rakuunapatsas_newlook.webm","dual":"","audio":""},{"nimi":"Taistelijan muistomerkki","kuvaus":"","lat":61.0627355,"lng":28.1840569,"kuva":"02-tausta-taistelijan-patsas.png","video":"02-avatar-taistelijan_patsas_new_look.webm","dual":"","audio":""}],route=[[61.062397,28.184094],[61.062771,28.18403],[61.06371,28.183794],[61.065948,28.183322],[61.067058,28.183032],[61.067131,28.18388],[61.067339,28.183928],[61.067422,28.185259],[61.067261,28.18536]];let idx=0,auto=false,anim=null,timer=null,paused=false,animationState=null,pendingNext=false;
+const pts=[{"nimi":"Rakuunapatsas","kuvaus":"","lat":61.0623877,"lng":28.1840998,"kuva":"01-tausta-valaistu-rakuunapatsas-iltahamarassa.png","video":"01-avatar-rakuunapatsas_newlook.webm","dual":"","audio":""},{"nimi":"Taistelijan muistomerkki","kuvaus":"","lat":61.0627355,"lng":28.1840569,"kuva":"02-tausta-taistelijan-patsas.png","video":"02-avatar-taistelijan_patsas_new_look.webm","dual":"","audio":""}],route=[[61.062397,28.184094],[61.062771,28.18403],[61.06371,28.183794],[61.065948,28.183322],[61.067058,28.183032],[61.067131,28.18388],[61.067339,28.183928],[61.067422,28.185259],[61.067261,28.18536]];let idx=0,auto=false,anim=null,timer=null,paused=false,animationState=null,pendingNext=false;window.laraWalking=false;window.laraPaused=false;
 const map=L.map('map').setView([61.0594,28.1775],17);L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri'}).addTo(map);
 const icon=L.divIcon({className:'',html:"<div id=\"lara3d\" style=\"width:90px;height:120px\"></div>",iconSize:[90,120],iconAnchor:[45,115]});
 if(route.length>1)L.polyline(route,{color:'#9ca3af',weight:3,opacity:.65}).addTo(map);
@@ -36,7 +36,7 @@ function startShow(){document.getElementById('start').style.display='none';pause
  function updatePauseButtons(){['pausebtn','modalpause'].forEach(id=>{const b=document.getElementById(id);if(b)b.textContent=paused?'▶ Jatka':'⏸ Tauko'})}
  function togglePause(){paused=!paused;window.laraPaused=paused;[bg,av,dualvideo,audio].forEach(v=>{if(paused){if(!v.paused){v.dataset.wasplaying='1';v.pause()}else v.dataset.wasplaying='0'}else if(v.dataset.wasplaying==='1'){v.play().catch(()=>{});v.dataset.wasplaying='0'}});if(!paused&&dualvideo.dataset.wasplaying==='0'&&dualvideo.src&&dualvideo.readyState>=2&&dualRenderId!==null){cancelAnimationFrame(dualRenderId);dualRenderId=null;dualFrame()}if(!paused&&pendingNext){const action=pendingNext;pendingNext=false;if(action==='advance')go(idx+1,false);else next()}updatePauseButtons()}
  function routeSegment(from,to){if(route.length<2)return [[from.lat,from.lng],[to.lat,to.lng]];let nearest=(pos)=>{let best=0,dist=Infinity;route.forEach((v,i)=>{let d=(v[0]-pos.lat)**2+(v[1]-pos.lng)**2;if(d<dist){dist=d;best=i}});return best};let a=nearest(from),b=nearest(to);let part=a<=b?route.slice(a,b+1):route.slice(b,a+1).reverse();return [[from.lat,from.lng],...part,[to.lat,to.lng]]}
- function animateRoute(from,to,done){const path=routeSegment(from,to),lengths=[0];for(let k=1;k<path.length;k++){const a=path[k-1],b=path[k];const dx=(b[1]-a[1])*Math.cos(a[0]*Math.PI/180),dy=b[0]-a[0];lengths.push(lengths.at(-1)+Math.hypot(dx,dy))}const total=lengths.at(-1)||1;let elapsed=0,last=null;function frame(now){if(last===null)last=now;const delta=now-last;last=now;if(!paused)elapsed+=delta;const d=Math.min(elapsed/Math.max(3500,path.length*80),1)*total;let k=1;while(k<lengths.length-1&&lengths[k]<d)k++;const portion=(d-lengths[k-1])/Math.max(lengths[k]-lengths[k-1],1e-12),a=path[k-1],b=path[k];marker.setLatLng([a[0]+(b[0]-a[0])*portion,a[1]+(b[1]-a[1])*portion]);if(d<total)anim=requestAnimationFrame(frame);else{anim=null;done()}}anim=requestAnimationFrame(frame)}
+ function animateRoute(from,to,done){window.laraWalking=true;const path=routeSegment(from,to),lengths=[0];for(let k=1;k<path.length;k++){const a=path[k-1],b=path[k];const dx=(b[1]-a[1])*Math.cos(a[0]*Math.PI/180),dy=b[0]-a[0];lengths.push(lengths.at(-1)+Math.hypot(dx,dy))}const total=lengths.at(-1)||1;let elapsed=0,last=null;function frame(now){if(last===null)last=now;const delta=now-last;last=now;if(!paused)elapsed+=delta;const d=Math.min(elapsed/Math.max(3500,path.length*80),1)*total;let k=1;while(k<lengths.length-1&&lengths[k]<d)k++;const portion=(d-lengths[k-1])/Math.max(lengths[k]-lengths[k-1],1e-12),a=path[k-1],b=path[k];marker.setLatLng([a[0]+(b[0]-a[0])*portion,a[1]+(b[1]-a[1])*portion]);if(d<total)anim=requestAnimationFrame(frame);else{anim=null;window.laraWalking=false;done()}}anim=requestAnimationFrame(frame)}
 const preloadKeep=new Map();
 function preloadMedia(src){
  if(!src||preloadKeep.has(src))return;
@@ -49,7 +49,7 @@ function preloadMedia(src){
  }
 }
 function preloadPoint(p){if(!p)return;[p.kuva,p.dual||p.video,p.audio].forEach(preloadMedia)}
-function go(i,direct){if(paused)return;stopMedia();idx=i;const p=pts[i];preloadPoint(p);preloadPoint(pts[i+1]);const from=marker.getLatLng(),to=L.latLng(p.lat,p.lng);if(direct){marker.setLatLng(to);map.flyTo(to,18,{duration:1.2});activate(p)}else{animateRoute(from,to,()=>{map.flyTo(to,18,{duration:1});activate(p)})}}
+function go(i,direct){if(paused)return;if(anim){cancelAnimationFrame(anim);anim=null;}window.laraWalking=false;stopMedia();idx=i;const p=pts[i];preloadPoint(p);preloadPoint(pts[i+1]);const from=marker.getLatLng(),to=L.latLng(p.lat,p.lng);if(direct){marker.setLatLng(to);map.flyTo(to,18,{duration:1.2});activate(p)}else{animateRoute(from,to,()=>{map.flyTo(to,18,{duration:1});activate(p)})}}
 window.addEventListener('load',()=>{preloadPoint(pts[0]);preloadPoint(pts[1])});
  function createDualRenderer(){
   const gl=dualcanvas.getContext('webgl',{alpha:true,premultipliedAlpha:false});
@@ -112,7 +112,7 @@ function next(){
  }
 function stopMedia(){mediaAttempt++;if(dualRenderId!==null){cancelAnimationFrame(dualRenderId);dualRenderId=null}dualvideo.pause();dualvideo.removeAttribute('src');dualvideo.onended=null;dualvideo.onerror=null;dualcanvas.style.display='none';audio.pause();audio.removeAttribute('src');av.pause();av.removeAttribute('src');bg.pause();bg.removeAttribute('src');if(timer)clearTimeout(timer)}
 function closeModal(){modal.style.display='none';if(!auto)modal.classList.remove('expanded');updateFsButtons();const e=document.getElementById('endlink');if(e)e.style.display='none';stopMedia()}
-function stopAll(){paused=false;pendingNext=false;updatePauseButtons();auto=false;if(anim)cancelAnimationFrame(anim);modal.classList.remove('expanded');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});closeModal();t.textContent='Esittely pysäytetty';d.textContent='Voit valita kohteen kartalta tai aloittaa uudelleen.'}
+function stopAll(){window.laraWalking=false;window.laraPaused=false;paused=false;pendingNext=false;updatePauseButtons();auto=false;if(anim)cancelAnimationFrame(anim);modal.classList.remove('expanded');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});closeModal();t.textContent='Esittely pysäytetty';d.textContent='Voit valita kohteen kartalta tai aloittaa uudelleen.'}
 </script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
 <script type="module">
 import * as THREE from 'three';
@@ -127,22 +127,25 @@ if(holder){
  holder.appendChild(renderer.domElement);
  scene.add(new THREE.HemisphereLight(0xffffff,0x64748b,2.6));
  const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(2,5,4);scene.add(light);
- let mixer=null,clock=new THREE.Clock(),model=null,wrapper=null,frameCount=0;
- // Karttaliikkeen seuranta: suunta muuttuu vain kun merkki todella liikkuu.
- let lastPos=null, lastMoveAt=0, facing=0;
+ let mixer=null,action=null,clock=new THREE.Clock(),model=null,wrapper=null;
  const facingGroup=new THREE.Group();scene.add(facingGroup);
- const facingOffset=Math.PI; // Mallin etusuunta; voidaan hienosäätää testin jälkeen.
+ const facingOffset=Math.PI; // Säilytetään viime testissä oikeaksi todettu suunta.
  const turnSpeed=5;
- // Pidä animoitu hahmo keskitettynä muuttamatta animaation ohjaamaa mallin sijaintia.
- function fitLara(){
+ const start=pts[0],nextPoint=pts[1]||pts[0];
+ const initialEast=(nextPoint.lng-start.lng)*Math.cos(start.lat*Math.PI/180);
+ const initialNorth=nextPoint.lat-start.lat;
+ let facing=Math.atan2(initialEast,initialNorth)+facingOffset;
+ facingGroup.rotation.y=facing; // Oikea suunta jo ennen ensimmäistä askelta.
+ let lastPos={lat:marker.getLatLng().lat,lng:marker.getLatLng().lng};
+ let wasWalking=false;
+ function fitLaraOnce(){
    if(!model||!wrapper)return;
-   wrapper.scale.setScalar(1);wrapper.position.set(0,0,0);
    model.updateMatrixWorld(true);
    const bounds=new THREE.Box3().setFromObject(model);
    if(bounds.isEmpty())return;
    const size=bounds.getSize(new THREE.Vector3());
    const center=bounds.getCenter(new THREE.Vector3());
-   const scale=1.25/Math.max(size.y,0.001);
+   const scale=1.0/Math.max(size.y,0.001); // 20 % pienempi kuin 1.25.
    wrapper.scale.setScalar(scale);
    wrapper.position.set(-center.x*scale,-bounds.min.y*scale,-center.z*scale);
  }
@@ -151,33 +154,50 @@ if(holder){
    wrapper=new THREE.Group();wrapper.add(model);facingGroup.add(wrapper);
    const clips=gltf.animations||[];
    const walking=clips.find(a=>/walk/i.test(a.name))||clips[0];
-   if(walking){mixer=new THREE.AnimationMixer(model);mixer.clipAction(walking).play();mixer.update(0.01)}
-   fitLara();
+   if(walking){
+     // Poistetaan juuren/lantion paikkasiirtymät (root motion), jotka
+     // voivat liikuttaa hahmoa ylös/alas tai pois karttamerkin keskeltä.
+     // Luuston kiertoliikkeet ja jalkojen kävely säilyvät.
+     const cleaned=walking.clone();
+     cleaned.tracks=cleaned.tracks.filter(track=>{
+       if(!track.name.endsWith('.position'))return true;
+       const node=track.name.slice(0,-'.position'.length).toLowerCase();
+       return !/(hips|pelvis|root|armature|mixamorig|scene)/i.test(node);
+     });
+     cleaned.resetDuration();
+     mixer=new THREE.AnimationMixer(model);
+     action=mixer.clipAction(cleaned);
+     action.setLoop(THREE.LoopRepeat,Infinity);
+     action.play();
+     action.paused=true;
+     mixer.update(0);
+   }
+   fitLaraOnce(); // Mittakaavaa ei muuteta animaation jokaisella askeleella.
    holder.title='Lara 3D – '+(walking?walking.name:'ei animaatiota');
  },undefined,e=>{console.error('GLB-Laran lataus epäonnistui',e);holder.textContent='⚠️ GLB ei latautunut';});
  function frame(){
    requestAnimationFrame(frame);
-   const dt=clock.getDelta();
+   const dt=Math.min(clock.getDelta(),0.05);
    const pos=marker.getLatLng();
-   const now=performance.now();
-   if(lastPos){
-     const east=(pos.lng-lastPos.lng)*Math.cos(pos.lat*Math.PI/180);
-     const north=pos.lat-lastPos.lat;
-     if(Math.hypot(east,north)>0.000000015){
-       // Three.js-hahmon Y-kierto; kartalla pohjoinen ylös, itä oikealle.
-       facing=Math.atan2(east,north)+facingOffset;
-       lastMoveAt=now;
+   const east=(pos.lng-lastPos.lng)*Math.cos(pos.lat*Math.PI/180);
+   const north=pos.lat-lastPos.lat;
+   const actuallyMoved=Math.hypot(east,north)>0.000000015;
+   if(actuallyMoved){facing=Math.atan2(east,north)+facingOffset;}
+   lastPos={lat:pos.lat,lng:pos.lng};
+   const walkingNow=!!window.laraWalking && !window.laraPaused;
+   if(action){
+     if(walkingNow){
+       action.paused=false;
+       mixer.update(dt);
+     }else if(wasWalking){
+       // Pysäytys palauttaa seisoma-asentoon, ei jätä askelta kesken.
+       action.paused=false;action.reset().play();mixer.update(0);
+       action.paused=true;
      }
    }
-   lastPos={lat:pos.lat,lng:pos.lng};
-   const moving=now-lastMoveAt<220 && !window.laraPaused;
-   if(mixer && moving)mixer.update(dt);
-   if(model){
-     // Pehmeä kääntyminen ilman äkillistä pyörähdystä.
-     let diff=Math.atan2(Math.sin(facing-facingGroup.rotation.y),Math.cos(facing-facingGroup.rotation.y));
-     facingGroup.rotation.y+=Math.sign(diff)*Math.min(Math.abs(diff),dt*turnSpeed);
-     if(++frameCount%12===0)fitLara();
-   }
+   wasWalking=walkingNow;
+   let diff=Math.atan2(Math.sin(facing-facingGroup.rotation.y),Math.cos(facing-facingGroup.rotation.y));
+   facingGroup.rotation.y+=Math.sign(diff)*Math.min(Math.abs(diff),dt*turnSpeed);
    renderer.render(scene,camera);
  }
  frame();
