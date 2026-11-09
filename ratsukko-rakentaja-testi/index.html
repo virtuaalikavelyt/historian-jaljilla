@@ -5,7 +5,7 @@
 <div id="map"></div><div class="controls"><button onclick="startShow()">▶ Katso virtuaaliesittely</button><button class="pausebtn" id="pausebtn" onclick="togglePause()">⏸ Tauko</button><button onclick="stopAll()">⏹ Pysäytä</button><button class="fsbtn" id="fsbtn" onclick="toggleFullscreen()">⛶ Koko näyttö</button></div><div class="info"><b id="t">Tervetuloa virtuaalikävelylle</b><div id="d">Tutustu kohteisiin virtuaalisesti. Paina Aloita virtuaaliesittely.</div></div>
 <div class="modal" id="modal"><div class="box" id="box"><video class="bg" id="bg" autoplay loop muted playsinline></video><button class="close" onclick="auto=false;closeModal()">✕</button><button class="pausebtn" id="modalpause" style="position:absolute;top:12px;left:12px;z-index:22" onclick="togglePause()">⏸ Tauko</button><button class="fsbtn fsmodal" id="fsmodal" onclick="toggleFullscreen()" aria-label="Koko näyttö">⛶</button><canvas class="firecanvas" id="firecanvas"></canvas><div class="horse3d" id="horse3d"></div><canvas class="dualcanvas" id="dualcanvas" width="540" height="960"></canvas><video id="dualvideo" playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nofullscreen nodownload noremoteplayback" style="position:absolute;width:2px;height:2px;opacity:.01;pointer-events:none"></video><video class="avatar" id="av" autoplay controls playsinline></video><div class="panel" id="panel"><b id="mt"></b><div id="md"></div></div></div></div><audio id="audio"></audio>
 <script>
-const pts=[{"nimi":"Ratsuväkimuseo","kuvaus":"","lat":61.0640955,"lng":28.1837243,"kuva":"../ratsu-rakuuna-testi/museo_ilman_hevosta.jpg","video":"","dual":"","audio":"","fire":false,"horse":true,"horseGlb":"../ratsu-rakuuna-testi/Cavalry_Horse_Model.glb","riderGlb":"../ratsu-rakuuna-testi/Rakuuna.glb"}],route=[];let idx=0,auto=false,anim=null,timer=null,paused=false,animationState=null,pendingNext=false;window.laraWalking=false;window.laraPaused=false;
+const pts=[{"nimi":"ratsuväenmuseo","kuvaus":"","lat":61.0623825,"lng":28.1840783,"kuva":"01-tausta-museo_ilman_hevosta.jpg","video":"01-avatar-ratsuvakimuseo_new_look.webm","dual":"","audio":"","fire":false,"horse":true,"horseGlb":"01-hevonen-cavalry_horse_model.glb","riderGlb":"01-rakuuna-rakuuna.glb"}],route=[];let idx=0,auto=false,anim=null,timer=null,paused=false,animationState=null,pendingNext=false;window.laraWalking=false;window.laraPaused=false;
 const map=L.map('map').setView([61.0594,28.1775],17);L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri'}).addTo(map);
 const icon=L.divIcon({className:'',html:"<div style=\"font-size:38px\">🚶</div>",iconSize:[65,65],iconAnchor:[32,32]});
 if(route.length>1)L.polyline(route,{color:'#9ca3af',weight:3,opacity:.65}).addTo(map);
@@ -82,6 +82,8 @@ window.addEventListener('load',()=>{preloadPoint(pts[0]);preloadPoint(pts[1])});
  function playAudioFallback(p,attempt){
   if(attempt!==mediaAttempt)return;
   av.pause();av.style.display='none';
+  // Pelkkä 3D-ratsukko: ei automaattista 3 sekunnin lopetusta.
+  if(p.horse && !p.video && !p.dual && !p.audio)return;
   if(p.audio){audio.src=p.audio;audio.onended=()=>{if(attempt===mediaAttempt)next()};audio.onerror=()=>{if(attempt===mediaAttempt)next()};audio.play().catch(()=>{if(attempt===mediaAttempt)next()})}
   else timer=setTimeout(()=>{if(attempt===mediaAttempt)next()},3000);
  }
@@ -137,7 +139,9 @@ window.addEventListener('load',()=>{preloadPoint(pts[0]);preloadPoint(pts[1])});
   box.style.backgroundImage='none';bg.style.display='none';bg.removeAttribute('src');
   if(p.kuva){if(p.kuva.toLowerCase().endsWith('.mp4')){bg.src=p.kuva;bg.style.display='block';bg.play().catch(()=>{})}else box.style.backgroundImage="url('"+p.kuva+"')"}
     modal.style.display='flex';window.dispatchEvent(new CustomEvent('ratsukko-show',{detail:p}));if(p.fire && p.kuva && !p.kuva.toLowerCase().endsWith('.mp4'))startFire();else stopFire();av.style.display='none';av.removeAttribute('src');dualcanvas.style.display='none';
-  if(p.dual){
+  function startNarration(){
+   if(attempt!==mediaAttempt)return;
+   if(p.dual){
    try{
     if(!dualRenderer)dualRenderer=createDualRenderer();
     dualcanvas.style.display='block';dualvideo.src=p.dual;
@@ -145,7 +149,22 @@ window.addEventListener('load',()=>{preloadPoint(pts[0]);preloadPoint(pts[1])});
     dualvideo.onerror=()=>{console.warn('Kaksoiskuva-MP4 ei latautunut');playWebmFallback(p,attempt)};
     dualvideo.play().then(()=>{if(attempt===mediaAttempt)dualFrame()}).catch(err=>{console.warn('Kaksoiskuva-MP4 ei käynnistynyt',err);playWebmFallback(p,attempt)});
    }catch(err){console.error(err);playWebmFallback(p,attempt)}
-  }else playWebmFallback(p,attempt);
+   }else playWebmFallback(p,attempt);
+  }
+  // Odota ratsukon valmistumista ennen Laran tarinan käynnistämistä.
+  // Jos malli ei lataudu, tarina saa silti jatkua.
+  if(p.horse&&p.horseGlb&&p.riderGlb){
+   const key=p.horseGlb+'|'+p.riderGlb;
+   if(window.ratsukkoReadyKey===key){startNarration();}
+   else{
+    const ready=e=>{if(e.detail===key)finish()};
+    const failed=e=>{if(e.detail===key)finish()};
+    function finish(){window.removeEventListener('ratsukko-ready',ready);window.removeEventListener('ratsukko-error',failed);startNarration()}
+    window.addEventListener('ratsukko-ready',ready);
+    window.addEventListener('ratsukko-error',failed);
+    if(window.ratsukkoReadyKey===key)finish();
+   }
+  }else startNarration();
  }
 function next(){
   if(idx===pts.length-1){
@@ -158,95 +177,6 @@ function next(){
 function stopMedia(){window.dispatchEvent(new CustomEvent('ratsukko-show',{detail:null}));stopFire();mediaAttempt++;if(dualRenderId!==null){cancelAnimationFrame(dualRenderId);dualRenderId=null}dualvideo.pause();dualvideo.removeAttribute('src');dualvideo.onended=null;dualvideo.onerror=null;dualcanvas.style.display='none';audio.pause();audio.removeAttribute('src');av.pause();av.removeAttribute('src');bg.pause();bg.removeAttribute('src');if(timer)clearTimeout(timer)}
 function closeModal(){modal.style.display='none';if(!auto)modal.classList.remove('expanded');updateFsButtons();const e=document.getElementById('endlink');if(e)e.style.display='none';stopMedia()}
 function stopAll(){window.laraWalking=false;window.laraPaused=false;paused=false;pendingNext=false;updatePauseButtons();auto=false;if(anim)cancelAnimationFrame(anim);modal.classList.remove('expanded');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});closeModal();t.textContent='Esittely pysäytetty';d.textContent='Voit valita kohteen kartalta tai aloittaa uudelleen.'}
-</script><script type="module">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
-<script type="module">
-import * as THREE from 'three';
-import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-const holder=document.getElementById('lara3d');
-if(holder){
- const scene=new THREE.Scene();
- const camera=new THREE.PerspectiveCamera(34,90/120,.01,100);
- camera.position.set(0,.75,4.4);camera.lookAt(0,.65,0);
- const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
- renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(90,120);renderer.outputColorSpace=THREE.SRGBColorSpace;
- holder.appendChild(renderer.domElement);
- scene.add(new THREE.HemisphereLight(0xffffff,0x64748b,2.6));
- const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(2,5,4);scene.add(light);
- let mixer=null,action=null,clock=new THREE.Clock(),model=null,wrapper=null;
- const facingGroup=new THREE.Group();scene.add(facingGroup);
- const facingOffset=Math.PI; // Säilytetään viime testissä oikeaksi todettu suunta.
- const turnSpeed=5;
- const start=pts[0],nextPoint=pts[1]||pts[0];
- const initialEast=(nextPoint.lng-start.lng)*Math.cos(start.lat*Math.PI/180);
- const initialNorth=nextPoint.lat-start.lat;
- let facing=Math.atan2(initialEast,initialNorth)+facingOffset;
- facingGroup.rotation.y=facing; // Oikea suunta jo ennen ensimmäistä askelta.
- let lastPos={lat:marker.getLatLng().lat,lng:marker.getLatLng().lng};
- let wasWalking=false;
- function fitLaraOnce(){
-   if(!model||!wrapper)return;
-   model.updateMatrixWorld(true);
-   const bounds=new THREE.Box3().setFromObject(model);
-   if(bounds.isEmpty())return;
-   const size=bounds.getSize(new THREE.Vector3());
-   const center=bounds.getCenter(new THREE.Vector3());
-   const scale=1.0/Math.max(size.y,0.001); // 20 % pienempi kuin 1.25.
-   wrapper.scale.setScalar(scale);
-   wrapper.position.set(-center.x*scale,-bounds.min.y*scale,-center.z*scale);
- }
- new GLTFLoader().load("hahmo-meshy_ai_rigged_female_character_20261105_animated_mixamo_all_animation.glb",gltf=>{
-   model=gltf.scene;
-   wrapper=new THREE.Group();wrapper.add(model);facingGroup.add(wrapper);
-   const clips=gltf.animations||[];
-   const walking=clips.find(a=>/walk/i.test(a.name))||clips[0];
-   if(walking){
-     // Poistetaan juuren/lantion paikkasiirtymät (root motion), jotka
-     // voivat liikuttaa hahmoa ylös/alas tai pois karttamerkin keskeltä.
-     // Luuston kiertoliikkeet ja jalkojen kävely säilyvät.
-     const cleaned=walking.clone();
-     cleaned.tracks=cleaned.tracks.filter(track=>{
-       if(!track.name.endsWith('.position'))return true;
-       const node=track.name.slice(0,-'.position'.length).toLowerCase();
-       return !/(hips|pelvis|root|armature|mixamorig|scene)/i.test(node);
-     });
-     cleaned.resetDuration();
-     mixer=new THREE.AnimationMixer(model);
-     action=mixer.clipAction(cleaned);
-     action.setLoop(THREE.LoopRepeat,Infinity);
-     action.play();
-     action.paused=true;
-     mixer.update(0);
-   }
-   fitLaraOnce(); // Mittakaavaa ei muuteta animaation jokaisella askeleella.
-   holder.title='Lara 3D – '+(walking?walking.name:'ei animaatiota');
- },undefined,e=>{console.error('GLB-Laran lataus epäonnistui',e);holder.textContent='⚠️ GLB ei latautunut';});
- function frame(){
-   requestAnimationFrame(frame);
-   const dt=Math.min(clock.getDelta(),0.05);
-   const pos=marker.getLatLng();
-   const east=(pos.lng-lastPos.lng)*Math.cos(pos.lat*Math.PI/180);
-   const north=pos.lat-lastPos.lat;
-   const actuallyMoved=Math.hypot(east,north)>0.000000015;
-   if(actuallyMoved){facing=Math.atan2(east,north)+facingOffset;}
-   lastPos={lat:pos.lat,lng:pos.lng};
-   const walkingNow=!!window.laraWalking && !window.laraPaused;
-   if(action){
-     if(walkingNow){
-       action.paused=false;
-       mixer.update(dt);
-     }else if(wasWalking){
-       // Pysäytys palauttaa seisoma-asentoon, ei jätä askelta kesken.
-       action.paused=false;action.reset().play();mixer.update(0);
-       action.paused=true;
-     }
-   }
-   wasWalking=walkingNow;
-   let diff=Math.atan2(Math.sin(facing-facingGroup.rotation.y),Math.cos(facing-facingGroup.rotation.y));
-   facingGroup.rotation.y+=Math.sign(diff)*Math.min(Math.abs(diff),dt*turnSpeed);
-   renderer.render(scene,camera);
- }
- frame();
-}
 </script><script type="module">
  import * as THREE from 'three';
  import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -271,13 +201,16 @@ if(holder){
  }
  function loadPair(horseFile,riderFile){
   const key=horseFile+'|'+riderFile;if(key===loadedKey||key===loadingKey)return;
-  loadingKey=key;loadedKey='';pivot.clear();pivot.add(riderGroup);riderGroup.clear();
+  loadingKey=key;loadedKey='';window.ratsukkoReadyKey='';pivot.clear();pivot.add(riderGroup);riderGroup.clear();
   Promise.all([new Promise((resolve,reject)=>loader.load(horseFile,g=>resolve(g.scene),undefined,reject)),new Promise((resolve,reject)=>loader.load(riderFile,g=>resolve(g.scene),undefined,reject))]).then(([horse,rider])=>{
    if(loadingKey!==key)return;
    for(const model of [horse,rider]){const bounds=new THREE.Box3().setFromObject(model),center=bounds.getCenter(new THREE.Vector3());model.position.sub(center)}
-   pivot.add(horse);riderGroup.add(rider);loadedKey=key;loadingKey='';
-  }).catch(e=>{console.error('Ratsukon lataus epäonnistui',e);loadingKey='';});
+   pivot.add(horse);riderGroup.add(rider);loadedKey=key;loadingKey='';window.ratsukkoReadyKey=key;window.dispatchEvent(new CustomEvent('ratsukko-ready',{detail:key}));
+  }).catch(e=>{console.error('Ratsukon lataus epäonnistui',e);loadingKey='';window.dispatchEvent(new CustomEvent('ratsukko-error',{detail:key}));});
  }
+ // Aloita suuren 3D-mallin lataus heti sivun avauduttua, ennen museon tarinaa.
+ const preloadedHorse=[{"horseGlb":"01-hevonen-cavalry_horse_model.glb","riderGlb":"01-rakuuna-rakuuna.glb"}];
+ if(preloadedHorse.length)loadPair(preloadedHorse[0].horseGlb,preloadedHorse[0].riderGlb);
  window.addEventListener('ratsukko-show',e=>{
   const p=e.detail;active=!!(p&&p.horse&&p.horseGlb&&p.riderGlb);
   holder.style.display=active?'block':'none';
