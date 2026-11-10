@@ -5,7 +5,7 @@
 <div id="map"></div><div class="controls"><button onclick="startShow()">▶ Katso virtuaaliesittely</button><button class="pausebtn" id="pausebtn" onclick="togglePause()">⏸ Tauko</button><button onclick="stopAll()">⏹ Pysäytä</button><button class="fsbtn" id="fsbtn" onclick="toggleFullscreen()">⛶ Koko näyttö</button></div><div class="info"><b id="t">Tervetuloa virtuaalikävelylle</b><div id="d">Tutustu kohteisiin virtuaalisesti. Paina Aloita virtuaaliesittely.</div></div>
 <div class="modal" id="modal"><div class="box" id="box"><video class="bg" id="bg" autoplay loop muted playsinline></video><button class="close" onclick="auto=false;closeModal()">✕</button><button class="pausebtn" id="modalpause" style="position:absolute;top:12px;left:12px;z-index:22" onclick="togglePause()">⏸ Tauko</button><button class="fsbtn fsmodal" id="fsmodal" onclick="toggleFullscreen()" aria-label="Koko näyttö">⛶</button><canvas class="firecanvas" id="firecanvas"></canvas><div class="horse3d" id="horse3d"></div><canvas class="dualcanvas" id="dualcanvas" width="540" height="960"></canvas><video id="dualvideo" playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nofullscreen nodownload noremoteplayback" style="position:absolute;width:2px;height:2px;opacity:.01;pointer-events:none"></video><video class="avatar" id="av" autoplay controls playsinline></video><div class="panel" id="panel"><b id="mt"></b><div id="md"></div></div></div></div><audio id="audio"></audio>
 <script>
-const pts=[{"nimi":"Rakuunapatsas","kuvaus":"","lat":61.0624209,"lng":28.1840649,"kuva":"01-tausta-valaistu-rakuunapatsas-iltahamarassa.png","video":"","dual":"01-dual-rakuunapatsas__vihre_newlook-english_uni_dual.mp4","audio":"","fire":false,"horse":false,"horseGlb":"","riderGlb":""}],route=[];let idx=0,auto=false,anim=null,timer=null,paused=false,animationState=null,pendingNext=false;window.laraWalking=false;window.laraPaused=false;
+const pts=[{"nimi":"Rakuunapatsas","kuvaus":"","lat":61.0594,"lng":28.1775,"kuva":"01-tausta-valaistu-rakuunapatsas-iltahamarassa.png","video":"","dual":"01-dual-rakuunapatsas__vihre_newlook-english_uni_dual.mp4","audio":"","fire":false,"horse":false,"horseGlb":"","riderGlb":""}],route=[];let idx=0,auto=false,anim=null,timer=null,paused=false,animationState=null,pendingNext=false;window.laraWalking=false;window.laraPaused=false;
 const map=L.map('map').setView([61.0594,28.1775],17);L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri'}).addTo(map);
 const icon=L.divIcon({className:'',html:"<div style=\"font-size:38px\">🚶</div>",iconSize:[65,65],iconAnchor:[32,32]});
 if(route.length>1)L.polyline(route,{color:'#9ca3af',weight:3,opacity:.65}).addTo(map);
@@ -132,6 +132,20 @@ window.addEventListener('load',()=>{preloadPoint(pts[0]);preloadPoint(pts[1])});
    fireRaf=requestAnimationFrame(fireFrame);
   }
   function startFire(){stopFire();firePhase=0;fireCanvas.style.display='block';fireRaf=requestAnimationFrame(fireFrame)}
+  // Kaksoiskuvan ilmoitukset: aiemmasta versiosta puuttuneet funktiot.
+  function hideDualMessage(){
+    const old=document.getElementById('dual-error-message');
+    if(old)old.remove();
+  }
+  function dualMessage(message){
+    hideDualMessage();
+    const el=document.createElement('div');
+    el.id='dual-error-message';
+    el.style.cssText='position:absolute;top:65px;left:12px;right:12px;z-index:30;background:#7f1d1d;color:white;padding:12px;border-radius:8px;font:14px Arial,sans-serif';
+    el.textContent=message;
+    box.appendChild(el);
+  }
+
  function activate(p){
   const attempt=++mediaAttempt;
   preloadPoint(pts[idx+1]);t.textContent=p.nimi;d.textContent=p.kuvaus;mt.textContent=p.nimi;md.textContent=p.kuvaus;
@@ -175,7 +189,7 @@ function next(){
   }
   closeModal();if(auto&&idx+1<pts.length)timer=setTimeout(()=>{if(paused){pendingNext='advance';return}go(idx+1,false)},1200);
  }
-function stopMedia(){window.dispatchEvent(new CustomEvent('ratsukko-show',{detail:null}));stopFire();mediaAttempt++;if(dualRenderId!==null){cancelAnimationFrame(dualRenderId);dualRenderId=null}dualvideo.pause();dualvideo.removeAttribute('src');dualvideo.onended=null;dualvideo.onerror=null;dualcanvas.style.display='none';audio.pause();audio.removeAttribute('src');av.pause();av.removeAttribute('src');bg.pause();bg.removeAttribute('src');if(timer)clearTimeout(timer)}
+function stopMedia(){window.dispatchEvent(new CustomEvent('ratsukko-show',{detail:null}));stopFire();mediaAttempt++;if(dualRenderId!==null){cancelAnimationFrame(dualRenderId);dualRenderId=null}dualvideo.pause();dualvideo.removeAttribute('src');dualvideo.onended=null;dualvideo.onerror=null;dualcanvas.style.display='none';hideDualMessage();audio.pause();audio.removeAttribute('src');av.pause();av.removeAttribute('src');bg.pause();bg.removeAttribute('src');if(timer)clearTimeout(timer)}
 function closeModal(){modal.style.display='none';if(!auto)modal.classList.remove('expanded');updateFsButtons();const e=document.getElementById('endlink');if(e)e.style.display='none';stopMedia()}
 function stopAll(){window.laraWalking=false;window.laraPaused=false;paused=false;pendingNext=false;updatePauseButtons();auto=false;if(anim)cancelAnimationFrame(anim);modal.classList.remove('expanded');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});closeModal();t.textContent='Esittely pysäytetty';d.textContent='Voit valita kohteen kartalta tai aloittaa uudelleen.'}
 </script></body></html>
